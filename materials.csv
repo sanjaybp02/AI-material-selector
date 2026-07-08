@@ -1,0 +1,36 @@
+Material Name,Category,Yield Strength (MPa),Density (g/cm³),Max Temp (°C),Elastic Modulus (GPa),Thermal Conductivity (W/m·K),Machinability (1-10),Cost per Kg (INR)
+Aluminum 6061,Metal,276,2.70,150,68.9,167,9,290.50
+Aluminum 7075,Metal,503,2.81,150,71.7,130,7,415.00
+Aluminum 2024,Metal,345,2.78,150,73.1,121,7,375.00
+Steel 1018,Metal,370,7.87,400,205,51,6,99.60
+Steel 4140,Metal,655,7.85,400,210,42,5,132.00
+Steel 4340,Metal,710,7.85,425,205,38,4,166.00
+Stainless Steel 304,Metal,215,8.00,870,193,16.2,4,265.00
+Stainless Steel 316,Metal,205,8.00,870,193,16.3,4,332.00
+Titanium Ti-6Al-4V,Metal,880,4.43,400,113,6.7,4,3735.00
+Inconel 718,Metal,1035,8.19,700,205,11.4,2,4980.00
+Copper C11000,Metal,220,8.89,200,117,390,7,664.00
+Brass C36000,Metal,310,8.50,260,97,115,10,580.00
+Bronze C93200,Metal,125,8.93,260,100,59,8,750.00
+Magnesium AZ31B,Metal,200,1.77,150,45,96,8,415.00
+Nickel 200,Metal,148,8.89,600,204,70,5,2490.00
+Tungsten,Metal,750,19.25,1650,411,173,1,4150.00
+Cast Iron (Grey),Metal,130,7.15,400,100,46,6,83.00
+Zinc Alloy (Zamak 3),Metal,228,6.60,100,85,113,9,290.50
+ABS Plastic,Polymer,40,1.04,80,2.3,0.17,10,207.50
+Nylon 6/6,Polymer,80,1.14,120,2.9,0.25,8,332.00
+Polycarbonate,Polymer,65,1.20,115,2.4,0.20,8,290.50
+PEEK,Polymer,100,1.30,250,3.6,0.25,6,7470.00
+PTFE (Teflon),Polymer,25,2.15,260,0.5,0.25,7,1245.00
+POM (Delrin),Polymer,70,1.41,110,3.1,0.31,9,332.00
+HDPE,Polymer,28,0.95,80,1.1,0.50,10,124.50
+PLA,Polymer,60,1.24,55,3.5,0.13,8,290.50
+PETG,Polymer,50,1.27,70,2.2,0.29,8,249.00
+Epoxy Resin,Polymer,75,1.20,150,3.0,0.20,5,498.00
+Carbon Fiber Composite,Composite,600,1.60,150,135,5,3,4980.00
+Glass Fiber Composite,Composite,300,1.90,130,35,0.30,4,1660.00
+Kevlar Composite,Composite,350,1.44,150,75,0.04,3,5810.00
+Alumina (Al2O3),Ceramic,260,3.96,1750,370,30,2,830.00
+Silicon Carbide (SiC),Ceramic,400,3.10,1600,410,120,1,2490.00
+Zirconia (ZrO2),Ceramic,900,6.05,1500,200,2,2,3320.00
+Borosilicate Glass,Ceramic,70,2.23,500,63,1.14,3,415.00

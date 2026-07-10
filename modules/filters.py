@@ -33,24 +33,26 @@ def _build_filter_chips(filter_meta, unit_system):
         u = "lb/in³" if unit_system == "Imperial" else "g/cm³"
         chips.append(f"Density ≤ {filter_meta['max_density']} {u}")
     if filter_meta.get("min_mach") and filter_meta["min_mach"] > 1:
-        chips.append(f"Machinability ≥ {filter_meta['min_mach']}")
+        chips.append(f"Machinability ≥ {filter_meta['min_mach']}/10")
     if filter_meta.get("min_modulus") is not None:
-        chips.append(f"Modulus ≥ {filter_meta['min_modulus']}")
+        mod_unit = "Mpsi" if unit_system == "Imperial" else "GPa"
+        chips.append(f"Modulus ≥ {filter_meta['min_modulus']} {mod_unit}")
     if filter_meta.get("min_tc") is not None:
-        chips.append("Thermal cond. filtered")
+        tc_unit = "BTU/hr·ft·°F" if unit_system == "Imperial" else "W/m·K"
+        chips.append(f"Thermal cond. ≥ {filter_meta['min_tc']} {tc_unit}")
     
     # New filter chips
     if filter_meta.get("min_fatigue") is not None:
         u = "psi" if unit_system == "Imperial" else "MPa"
         chips.append(f"Fatigue ≥ {filter_meta['min_fatigue']} {u}")
     if filter_meta.get("min_hardness") is not None:
-        chips.append(f"Hardness ≥ {filter_meta['min_hardness']}")
+        chips.append(f"Hardness ≥ {filter_meta['min_hardness']} HB")
     if filter_meta.get("min_corrosion") and filter_meta["min_corrosion"] > 1:
-        chips.append(f"Corrosion ≥ {filter_meta['min_corrosion']}")
+        chips.append(f"Corrosion ≥ {filter_meta['min_corrosion']}/10")
     if filter_meta.get("min_weld") and filter_meta["min_weld"] > 1:
-        chips.append(f"Weldability ≥ {filter_meta['min_weld']}")
+        chips.append(f"Weldability ≥ {filter_meta['min_weld']}/10")
     if filter_meta.get("min_uv") and filter_meta["min_uv"] > 1:
-        chips.append(f"UV ≥ {filter_meta['min_uv']}")
+        chips.append(f"UV ≥ {filter_meta['min_uv']}/10")
     if filter_meta.get("max_carbon") is not None:
         u = "lb CO2/lb" if unit_system == "Imperial" else "kg CO2/kg"
         chips.append(f"Carbon ≤ {filter_meta['max_carbon']} {u}")
@@ -81,6 +83,7 @@ def render_filters(df, mode, unit_system, settings):
 
     filtered = df.copy()
     filter_meta = {}
+    summary_meta = {}
 
     st.markdown("Use sliders to narrow the candidate pool before AI analysis.")
 
@@ -95,6 +98,9 @@ def render_filters(df, mode, unit_system, settings):
         )
         filter_meta["categories"] = selected_categories
         filter_meta["all_categories"] = all_categories
+        if len(selected_categories) < len(all_categories):
+            summary_meta["categories"] = selected_categories
+            summary_meta["all_categories"] = all_categories
         filtered = filtered[filtered["Category"].isin(selected_categories)]
 
     st.markdown("##### Industry Constraint Packs")
@@ -145,6 +151,8 @@ def render_filters(df, mode, unit_system, settings):
                 help="Materials must survive at or above this temperature.",
             )
             filter_meta["min_temp"] = min_temp
+            if min_temp > temp_min_val:
+                summary_meta["min_temp"] = min_temp
         else:
             min_temp = 0
 
@@ -162,6 +170,8 @@ def render_filters(df, mode, unit_system, settings):
                 help="Minimum structural strength required.",
             )
             filter_meta["min_yield"] = min_yield
+            if min_yield > yield_min_val:
+                summary_meta["min_yield"] = min_yield
         else:
             min_yield = 0
 
@@ -188,6 +198,8 @@ def render_filters(df, mode, unit_system, settings):
                     help="Lower density means lighter parts.",
                 )
                 filter_meta["max_density"] = max_density
+                if max_density < d_max:
+                    summary_meta["max_density"] = max_density
                 filtered = filtered[filtered[density_col] <= max_density]
 
             if modulus_col in df.columns and not df[modulus_col].empty:
@@ -203,6 +215,8 @@ def render_filters(df, mode, unit_system, settings):
                     help="Higher modulus = stiffer material.",
                 )
                 filter_meta["min_modulus"] = min_modulus
+                if min_modulus > mod_min:
+                    summary_meta["min_modulus"] = min_modulus
                 filtered = filtered[filtered[modulus_col] >= min_modulus]
 
             if fatigue_col in df.columns and not df[fatigue_col].empty:
@@ -218,6 +232,8 @@ def render_filters(df, mode, unit_system, settings):
                     help="Materials must resist cyclic loading above this strength.",
                 )
                 filter_meta["min_fatigue"] = min_fatigue
+                if min_fatigue > fat_min_val:
+                    summary_meta["min_fatigue"] = min_fatigue
                 filtered = filtered[filtered[fatigue_col] >= min_fatigue]
 
             if "Hardness (Brinell)" in df.columns and not df["Hardness (Brinell)"].empty:
@@ -232,6 +248,8 @@ def render_filters(df, mode, unit_system, settings):
                     help="Resistance to localized plastic deformation.",
                 )
                 filter_meta["min_hardness"] = min_hardness
+                if min_hardness > h_min:
+                    summary_meta["min_hardness"] = min_hardness
                 filtered = filtered[filtered["Hardness (Brinell)"] >= min_hardness]
 
         with ac2:
@@ -245,6 +263,8 @@ def render_filters(df, mode, unit_system, settings):
                     help="10 = easiest to machine.",
                 )
                 filter_meta["min_mach"] = min_mach
+                if min_mach > 1:
+                    summary_meta["min_mach"] = min_mach
                 filtered = filtered[filtered["Machinability (1-10)"] >= min_mach]
 
             if thermal_col in df.columns and not df[thermal_col].empty:
@@ -260,6 +280,8 @@ def render_filters(df, mode, unit_system, settings):
                     help="Important for heat sinks and exchangers.",
                 )
                 filter_meta["min_tc"] = min_tc
+                if min_tc > tc_min:
+                    summary_meta["min_tc"] = min_tc
                 filtered = filtered[filtered[thermal_col] >= min_tc]
 
             if "Corrosion Resistance (1-10)" in df.columns:
@@ -272,6 +294,8 @@ def render_filters(df, mode, unit_system, settings):
                     help="10 = extremely corrosion resistant.",
                 )
                 filter_meta["min_corrosion"] = min_corrosion
+                if min_corrosion > 1:
+                    summary_meta["min_corrosion"] = min_corrosion
                 filtered = filtered[filtered["Corrosion Resistance (1-10)"] >= min_corrosion]
 
             if "Weldability (1-10)" in df.columns:
@@ -284,6 +308,8 @@ def render_filters(df, mode, unit_system, settings):
                     help="10 = excellent weldability.",
                 )
                 filter_meta["min_weld"] = min_weld
+                if min_weld > 1:
+                    summary_meta["min_weld"] = min_weld
                 filtered = filtered[filtered["Weldability (1-10)"] >= min_weld]
 
             if "UV Resistance (1-10)" in df.columns:
@@ -296,6 +322,8 @@ def render_filters(df, mode, unit_system, settings):
                     help="10 = excellent resistance to UV degradation.",
                 )
                 filter_meta["min_uv"] = min_uv
+                if min_uv > 1:
+                    summary_meta["min_uv"] = min_uv
                 filtered = filtered[filtered["UV Resistance (1-10)"] >= min_uv]
 
             if carbon_col in df.columns and not df[carbon_col].empty:
@@ -311,6 +339,8 @@ def render_filters(df, mode, unit_system, settings):
                     help="Lower embodied carbon is more sustainable.",
                 )
                 filter_meta["max_carbon"] = max_carbon
+                if max_carbon < c_max:
+                    summary_meta["max_carbon"] = max_carbon
                 filtered = filtered[filtered[carbon_col] <= max_carbon]
 
         st.markdown("##### Compliance & Certification")
@@ -324,6 +354,7 @@ def render_filters(df, mode, unit_system, settings):
             )
             filter_meta["req_bio"] = req_bio
             if req_bio:
+                summary_meta["req_bio"] = True
                 filtered = filtered[filtered["Bio-compatible"] == "Yes"]
         with ch_c2:
             req_food = st.checkbox(
@@ -333,9 +364,10 @@ def render_filters(df, mode, unit_system, settings):
             )
             filter_meta["req_food"] = req_food
             if req_food:
+                summary_meta["req_food"] = True
                 filtered = filtered[filtered["Food Grade"] == "Yes"]
 
-    chips = _build_filter_chips(filter_meta, unit_system)
+    chips = _build_filter_chips(summary_meta, unit_system)
     render_filter_summary(chips)
 
     count = len(filtered)

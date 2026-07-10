@@ -33,13 +33,13 @@ def init_history():
     finally:
         conn.close()
 
-def log_search(query, materials, costs, volume, unit_system):
+def log_search(query, materials, costs, volume, unit_system, currency_symbol="₹"):
     init_history()
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     short_query = query[:80] + ("..." if len(query) > 80 else "")
     top_mat = materials[0]["MaterialName"] if materials else "N/A"
     conf = f"{materials[0].get('Confidence', 'N/A')}%" if materials else "N/A"
-    est_cost = f"₹{costs[0]:.2f}" if costs else "N/A"
+    est_cost = f"{currency_symbol}{costs[0]:.2f}" if costs else "N/A"
     num_res = len(materials)
 
     conn = get_connection()

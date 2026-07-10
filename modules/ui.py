@@ -100,6 +100,20 @@ button[kind="secondary"] {{
     font-size: 0.875rem !important;
 }}
 
+/* ── Compact guided tour utility button ── */
+div.st-key-manual_tour_btn {{
+    display: flex;
+    justify-content: flex-end;
+}}
+div.st-key-manual_tour_btn button {{
+    min-height: 2rem !important;
+    padding: 0.32rem 0.75rem !important;
+    border-radius: 999px !important;
+    font-size: 0.75rem !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+}}
+
 /* ── Tabs ── */
 div[data-testid="stTabs"] [data-baseweb="tab-list"] {{
     gap: 8px;

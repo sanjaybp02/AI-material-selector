@@ -76,6 +76,14 @@ def compute_part_cost(row, part_volume, cost_source, ai_data=None):
     return calculate_part_cost(row, part_volume, cost_source)
 
 
+def format_mass(result, unit_system):
+    mass_display = result.get("mass_display")
+    if mass_display is None:
+        mass_display = result["mass_kg"] if unit_system == "Metric" else result["mass_kg"] * 2.20462
+    mass_unit = result.get("mass_unit", "kg" if unit_system == "Metric" else "lb")
+    return mass_display, mass_unit
+
+
 # ── Dialogs ─────────────────────────────────────────────────────────
 @st.dialog("Save custom template")
 def create_template_dialog():
@@ -146,13 +154,14 @@ def render_template_picker(templates):
 
 def render_lite_results(r, currency, unit_system):
     st.success("Analysis complete")
+    mass_display, mass_unit = format_mass(r["result"], unit_system)
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Recommended material", r["exact_name"])
     c2.metric("Confidence", f"{r['confidence']}%")
     c3.metric(
         f"Est. part cost ({r['result']['source_label']})",
         f"{currency}{r['result']['total_cost']:.2f}",
-        delta=f"{r['result']['mass_kg']:.2f} kg" if unit_system == "Metric" else f"{r['result']['mass_kg'] * 2.20462:.2f} lb",
+        delta=f"{mass_display:.2f} {mass_unit}",
         delta_color="off",
     )
     
@@ -170,7 +179,7 @@ def render_lite_results(r, currency, unit_system):
 
     pdf_bytes = create_pdf(
         r["exact_name"], r["confidence"], r["reasoning"],
-        r["result"]["total_cost"], r["result"]["mass_kg"], r["part_volume"], currency,
+        r["result"]["total_cost"], mass_display, r["part_volume"], currency,
         r.get("properties"), carbon_val, carbon_unit
     )
     step_data = generate_step_file(r["exact_name"])
@@ -202,8 +211,32 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
 
     with tab_results:
         st.caption(f"{len(processed)} candidate(s) ranked by suitability")
+        summary_rows = []
+        for rank, item in enumerate(processed, start=1):
+            mass_display, mass_unit = format_mass(item["result"], unit_system)
+            carbon_val = item.get("total_carbon_kg", 0.0)
+            carbon_unit = "kg CO2"
+            if unit_system == "Imperial":
+                carbon_val = carbon_val * 2.20462
+                carbon_unit = "lb CO2"
+            summary_rows.append({
+                "Rank": rank,
+                "Material": item["exact_name"],
+                "Confidence": f"{item['confidence']}%",
+                "Cost": f"{currency}{item['result']['total_cost']:.2f}",
+                "Mass": f"{mass_display:.2f} {mass_unit}",
+                "Carbon": f"{carbon_val:.3f} {carbon_unit}",
+            })
+        if summary_rows:
+            st.dataframe(
+                pd.DataFrame(summary_rows),
+                hide_index=True,
+                use_container_width=True,
+            )
+            st.caption("Open a candidate below for engineering reasoning, exports, and datasheet details.")
         for rank, item in enumerate(processed):
             rank_label = f"Rank {rank + 1}"
+            mass_display, mass_unit = format_mass(item["result"], unit_system)
             with st.expander(f"{rank_label}: {item['exact_name']} — {item['confidence']}% confidence", expanded=(rank == 0)):
                 m1, m2, m3, m4 = st.columns(4)
                 m1.metric("Material", item["exact_name"])
@@ -211,7 +244,7 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
                 m3.metric(
                     f"Cost ({item['result']['source_label']})",
                     f"{currency}{item['result']['total_cost']:.2f}",
-                    delta=f"{item['result']['mass_kg']:.2f} kg" if unit_system == "Metric" else f"{item['result']['mass_kg'] * 2.20462:.2f} lb",
+                    delta=f"{mass_display:.2f} {mass_unit}",
                     delta_color="off",
                 )
                 carbon_val = item.get("total_carbon_kg", 0.0)
@@ -227,7 +260,7 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
                 
                 pdf_bytes = create_pdf(
                     item["exact_name"], item["confidence"], item["reasoning"],
-                    item["result"]["total_cost"], item["result"]["mass_kg"], item["part_volume"], currency,
+                    item["result"]["total_cost"], mass_display, item["part_volume"], currency,
                     item.get("properties"), carbon_val, carbon_unit
                 )
                 step_data = generate_step_file(item["exact_name"])
@@ -305,59 +338,19 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
 
 
 # ── Main Setup ────────────────────────────────────────────────────────
-if "welcome_complete" not in st.session_state:
-    st.session_state["welcome_complete"] = False
-
 # page config must be first
 st.set_page_config(
     page_title="Material Selector",
     page_icon=None,
     layout="wide",
-    initial_sidebar_state="collapsed" if not st.session_state["welcome_complete"] else "expanded",
+    initial_sidebar_state="expanded",
 )
 inject_theme()
-
-# Welcome screen loader
-if not st.session_state["welcome_complete"]:
-    st.markdown(
-        """
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80vh; text-align: center;">
-            <p style="font-size: 0.85rem; font-weight: 600; letter-spacing: 2px; color: #58a6ff; text-transform: uppercase; margin-bottom: 8px; font-family: 'Inter', sans-serif;">ENGINEERING INTELLIGENCE</p>
-            <h1 style="font-size: 2.8rem; font-weight: 800; color: #f0f6fc; margin: 0 0 12px 0; font-family: 'Inter', sans-serif;">AI Material Selector</h1>
-            <p style="font-size: 0.9rem; color: #8b949e; max-width: 500px; margin: 0 auto 32px auto; font-family: 'Inter', sans-serif; line-height: 1.5;">
-                Advanced material screening, comparative visuals, and carbon footprint telemetry powered by Google Gemini AI.
-            </p>
-            <div style="font-size: 2.5rem; color: #58a6ff; animation: spin-gear 2s linear infinite; margin-bottom: 40px;">⚙</div>
-            <p style="font-size: 0.85rem; color: #8b949e; font-family: 'Inter', sans-serif; font-weight: 500; letter-spacing: 0.5px;">made by Sanjay BP</p>
-        </div>
-        <style>
-        @keyframes spin-gear {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        /* Hide sidebar and header while on welcome screen */
-        section[data-testid="stSidebar"] { display: none !important; }
-        header[data-testid="stHeader"] { display: none !important; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-    import time
-    time.sleep(2.2)
-    st.session_state["welcome_complete"] = True
-    st.rerun()
 
 # Load main application data
 settings = load_settings()
 df_raw = load_data()
 init_history()
-
-# Check if new user to auto-trigger tour
-auto_trigger_tour = False
-if "tour_seen" not in settings:
-    settings["tour_seen"] = True
-    save_settings(settings)
-    auto_trigger_tour = True
 
 env_api_key = os.getenv("GEMINI_API_KEY", "")
 api_key_saved = bool(settings.get("api_key", env_api_key))
@@ -409,29 +402,31 @@ with st.sidebar:
 
 df_display = convert_units(df_raw, unit_system)
 
-# Auto-start tour on first launch
+# Tour state is user-controlled only so the interface does not block first-run screening.
 if "tour_active" not in st.session_state:
-    if auto_trigger_tour:
-        st.session_state["tour_active"] = True
-        st.session_state["tour_step"] = 1
-    else:
-        st.session_state["tour_active"] = False
-        st.session_state["tour_step"] = 1
+    st.session_state["tour_active"] = False
+    st.session_state["tour_step"] = 1
 
 # Render spotlight backdrop if tour active
 if st.session_state.get("tour_active"):
     st.markdown('<div class="tour-backdrop"></div>', unsafe_allow_html=True)
 
-# Guided Tour launcher top-left action
-col_tour_btn, col_empty = st.columns([1.2, 5])
-with col_tour_btn:
-    if st.button("Guided Tour", key="manual_tour_btn", use_container_width=True):
+# Main layout
+header_col, action_col = st.columns([5.8, 1.25])
+with header_col:
+    render_hero("Lite" if not is_advanced else "Advanced")
+with action_col:
+    st.markdown('<div style="height: 0.55rem;"></div>', unsafe_allow_html=True)
+    if st.button(
+        "Tour",
+        key="manual_tour_btn",
+        help="Open the guided tour",
+        use_container_width=True,
+    ):
         st.session_state["tour_active"] = True
         st.session_state["tour_step"] = 1
         st.rerun()
 
-# Main layout
-render_hero("Lite" if not is_advanced else "Advanced")
 st.caption("ENGINEERING INTELLIGENCE DASHBOARD")
 
 # Step 1 — Requirements
@@ -503,9 +498,9 @@ if is_advanced:
             )
         section_header("2", "Physical constraints", "Narrow the database before AI ranking.")
         filtered_df, filter_vals = render_filters(df_display, mode, unit_system, settings)
-        st.markdown("##### Candidate database")
-        st.caption("Edit values for what-if scenarios — changes apply to this session only.")
-        filtered_df = st.data_editor(filtered_df, hide_index=True, use_container_width=True)
+        with st.expander("Candidate database", expanded=False):
+            st.caption("Edit values for what-if scenarios — changes apply to this session only.")
+            filtered_df = st.data_editor(filtered_df, hide_index=True, use_container_width=True)
 else:
     filtered_df = df_display
     filter_vals = {}
@@ -554,7 +549,7 @@ if st.button("Find materials", type="primary", disabled=not can_search, use_cont
             if not is_advanced:
                 status.write("Querying AI for best match...")
                 ai_data = get_single_recommendation(client, db_string, final_query, model_name, cost_instruction)
-                row = match_material(df_raw, ai_data.get("MaterialName"))
+                row = match_material(df_display, ai_data.get("MaterialName"))
                 if row is None:
                     st.error(f"AI suggested '{ai_data.get('MaterialName')}', which wasn't found in the database.")
                 else:
@@ -573,7 +568,7 @@ if st.button("Find materials", type="primary", disabled=not can_search, use_cont
                         "carbon_per_kg": carbon_per_kg,
                     }
                     st.session_state["last_query"] = final_query
-                    log_search(final_query, [ai_data], [result["total_cost"]], part_volume, unit_system)
+                    log_search(final_query, [ai_data], [result["total_cost"]], part_volume, unit_system, get_currency_symbol(unit_system))
                     status.update(label="Analysis complete", state="complete")
             else:
                 status.write("Ranking top candidates...")
@@ -581,7 +576,7 @@ if st.button("Find materials", type="primary", disabled=not can_search, use_cont
                 processed, rec_names, cost_values = [], [], []
 
                 for ai_data in results_list:
-                    row = match_material(df_raw, ai_data.get("MaterialName"))
+                    row = match_material(df_display, ai_data.get("MaterialName"))
                     if row is None:
                         continue
                     exact_name = row["Material Name"]
@@ -615,7 +610,7 @@ if st.button("Find materials", type="primary", disabled=not can_search, use_cont
                         {"role": "model", "text": f"Top materials: {summary}. Ask follow-up questions about trade-offs, manufacturing, or alternatives."},
                     ]
                     st.session_state["chat_context"] = f"Current Material Database Context:\n{db_string}\nCost Source: {cost_source}\nCalculated Costs: {cost_values}"
-                    log_search(final_query, results_list, cost_values, part_volume, unit_system)
+                    log_search(final_query, results_list, cost_values, part_volume, unit_system, get_currency_symbol(unit_system))
                     status.update(label="Analysis complete", state="complete")
 
         except Exception as e:

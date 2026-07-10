@@ -1,6 +1,9 @@
 import requests
 import os
 
+KG_TO_LB = 2.20462
+DEFAULT_INR_TO_USD = 85.0
+
 
 def fetch_live_metal_price(material_name):
     """
@@ -61,41 +64,81 @@ def fetch_live_metal_price(material_name):
         return None, str(e)
 
 
-def calculate_part_cost(matched_row, part_volume, cost_source, cost_per_kg_override=None):
+def calculate_part_cost(
+    matched_row,
+    part_volume,
+    cost_source,
+    cost_per_kg_override=None,
+    inr_to_usd_rate=DEFAULT_INR_TO_USD,
+):
     """
     Calculate part cost from a matched material row.
 
     Parameters
     ----------
     matched_row : pd.Series
-        A single row from the materials DataFrame (Metric units).
+        A single row from the materials DataFrame in either Metric or Imperial display units.
     part_volume : float
-        Part volume in cm³.
+        Part volume in cm³ for Metric or in³ for Imperial.
     cost_source : str
         One of the cost source options.
     cost_per_kg_override : float or None
-        If provided, use this cost instead of CSV.
+        If provided, use this cost instead of CSV. The override is always interpreted as INR/kg.
+    inr_to_usd_rate : float
+        INR per USD conversion used when displaying Imperial results.
 
     Returns
     -------
-    dict with keys: cost_per_kg, mass_kg, total_cost, source_label
+    dict with keys: cost_per_kg, cost_per_unit, cost_unit, mass_kg, mass_display,
+    mass_unit, total_cost, source_label
     """
+    is_imperial = "Density (lb/in³)" in matched_row.index
+
+    if is_imperial:
+        density = float(matched_row["Density (lb/in³)"])
+        mass_display = part_volume * density
+        mass_kg = mass_display / KG_TO_LB
+        mass_unit = "lb"
+
+        if cost_per_kg_override is not None:
+            cost_per_unit = float(cost_per_kg_override) / inr_to_usd_rate / KG_TO_LB
+            source_label = "AI Estimated" if "AI" in cost_source else "Live API"
+        else:
+            cost_per_unit = float(matched_row["Cost per lb (USD)"])
+            source_label = "Database"
+
+        total_cost = mass_display * cost_per_unit
+        return {
+            "cost_per_kg": cost_per_unit,
+            "cost_per_unit": cost_per_unit,
+            "cost_unit": "USD/lb",
+            "mass_kg": mass_kg,
+            "mass_display": mass_display,
+            "mass_unit": mass_unit,
+            "total_cost": total_cost,
+            "source_label": source_label,
+        }
+
     density = float(matched_row["Density (g/cm³)"])
     mass_g = part_volume * density
     mass_kg = mass_g / 1000
 
     if cost_per_kg_override is not None:
-        cost_per_kg = cost_per_kg_override
+        cost_per_unit = float(cost_per_kg_override)
         source_label = "AI Estimated" if "AI" in cost_source else "Live API"
     else:
-        cost_per_kg = float(matched_row["Cost per Kg (INR)"])
+        cost_per_unit = float(matched_row["Cost per Kg (INR)"])
         source_label = "Database"
 
-    total_cost = mass_kg * cost_per_kg
+    total_cost = mass_kg * cost_per_unit
 
     return {
-        "cost_per_kg": cost_per_kg,
+        "cost_per_kg": cost_per_unit,
+        "cost_per_unit": cost_per_unit,
+        "cost_unit": "INR/kg",
         "mass_kg": mass_kg,
+        "mass_display": mass_kg,
+        "mass_unit": "kg",
         "total_cost": total_cost,
         "source_label": source_label,
     }

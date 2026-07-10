@@ -15,9 +15,9 @@ The AI Material Selector is an advanced engineering tool designed to streamline 
 The application was built with a "Defense/Industrial" aesthetic, prioritizing:
 - **Clarity over Clutter:** Utilizing `JetBrains Mono` for data and removing excessive white space.
 - **Speed (Lite Mode):** Offering a stripped-down mode for rapid, single-answer inferences.
-- **Deep Analysis (Normal Mode):** Offering full constraint manipulation and chat-based follow-ups for deep engineering research.
+- **Deep Analysis (Advanced Mode):** Offering full constraint manipulation and chat-based follow-ups for deep engineering research.
 
 ## Next Steps / Future Roadmap
-- Expand the `materials.csv` database to include composites and advanced polymers.
-- Integrate direct CAD exports or material property sheets in STEP/IGES format.
-- Add sustainability metrics (Carbon Footprint estimations) to the AI analysis.
+- Expand the `materials.csv` database to include advanced composites and additive manufacturing materials.
+- Implement user account logins and cloud template synchronization.
+- Integrate 3D STL mesh viewing directly in the Streamlit comparative tab.

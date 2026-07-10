@@ -19,6 +19,8 @@ METRIC_TO_IMPERIAL_COLUMNS = {
     "Density (g/cm³)": "Density (lb/in³)",
     "Thermal Conductivity (W/m·K)": "Thermal Conductivity (BTU/hr·ft·°F)",
     "Cost per Kg (INR)": "Cost per lb (USD)",
+    "Fatigue Strength (MPa)": "Fatigue Strength (psi)",
+    "Embodied Carbon (kg CO2/kg)": "Embodied Carbon (lb CO2/lb)",
 }
 
 # Default exchange rate — can be overridden by user
@@ -78,6 +80,15 @@ def convert_units(df, system="Metric", inr_to_usd_rate=DEFAULT_INR_TO_USD):
         converted["Cost per Kg (INR)"] = (converted["Cost per Kg (INR)"] / inr_to_usd_rate / 2.20462).round(2)
         converted.rename(columns={"Cost per Kg (INR)": "Cost per lb (USD)"}, inplace=True)
 
+    # Fatigue Strength: MPa -> psi  (× 145.038)
+    if "Fatigue Strength (MPa)" in converted.columns:
+        converted["Fatigue Strength (MPa)"] = (converted["Fatigue Strength (MPa)"] * 145.038).round(0)
+        converted.rename(columns={"Fatigue Strength (MPa)": "Fatigue Strength (psi)"}, inplace=True)
+
+    # Embodied Carbon: kg CO2/kg -> lb CO2/lb (remains numerically identical, rename column)
+    if "Embodied Carbon (kg CO2/kg)" in converted.columns:
+        converted.rename(columns={"Embodied Carbon (kg CO2/kg)": "Embodied Carbon (lb CO2/lb)"}, inplace=True)
+
     return converted
 
 
@@ -115,3 +126,11 @@ def get_volume_unit(system="Metric"):
 
 def get_mass_unit(system="Metric"):
     return "lb" if system == "Imperial" else "kg"
+
+
+def get_fatigue_col(system="Metric"):
+    return "Fatigue Strength (psi)" if system == "Imperial" else "Fatigue Strength (MPa)"
+
+
+def get_carbon_col(system="Metric"):
+    return "Embodied Carbon (lb CO2/lb)" if system == "Imperial" else "Embodied Carbon (kg CO2/kg)"

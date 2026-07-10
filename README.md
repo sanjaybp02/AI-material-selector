@@ -6,12 +6,12 @@
 
 ## 🚀 Features
 
-- **Dual Modes (Lite & Normal):**
-  - **⚡ Lite Mode:** A stripped-down, distraction-free interface that instantly returns the single best material recommendation based on a prompt.
-  - **🔬 Normal Mode:** A full-featured tactical dashboard with engineering constraint sliders, multi-material comparisons, interactive data matrices, and chat-based follow-ups.
+- **Dual Modes (Lite & Advanced):**
+  - **Lite Mode:** A stripped-down, distraction-free interface that instantly returns the single best material recommendation based on a prompt.
+  - **Advanced Mode:** A full-featured tactical dashboard with engineering constraint sliders, multi-material comparisons, interactive data matrices, and chat-based follow-ups.
 - **AI-Powered Recommendations:** Powered by Google Gemini. The engine cross-references your natural language constraints (e.g., "I need a lightweight, high-yield material for a drone frame") with a localized database of materials.
 - **Dynamic Cost Engine:** Estimates material costs using historical CSV data, AI market estimations, or Live MetalPrice API fetching. Calculates final part costs based on target volume and density.
-- **Tactical Industrial UI:** Built with a hardened "Defense/Industrial" aesthetic utilizing `JetBrains Mono` typography, glassmorphism containers, and sharp neon accents.
+- **Premium Enterprise SaaS UI:** Built with a clean, modern SaaS design using Inter typography, subtle grey borders, and a visually matched side panel.
 - **PDF Dossier Exports:** Instantly generate and download professional PDF reports for recommended materials, including engineering reasoning and cost breakdowns.
 - **Interactive Telemetry (Charts):** Radar charts, scatter plots, and property heatmaps built with Plotly to visually compare yield strength, density, cost, and machinability.
 - **Custom Template Vectors:** Save frequently used engineering prompts into the local database for rapid reuse.

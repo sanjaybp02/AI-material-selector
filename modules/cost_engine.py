@@ -1,4 +1,5 @@
 import requests
+import os
 
 
 def fetch_live_metal_price(material_name):
@@ -10,7 +11,7 @@ def fetch_live_metal_price(material_name):
     (price_per_kg_inr, error_message)
         price is float or None, error is str or None.
     """
-    api_key = "***REMOVED-METALPRICEAPI-KEY-REVOKED***"
+    api_key = os.getenv("METALPRICE_API_KEY", "***REMOVED-METALPRICEAPI-KEY-REVOKED***")
     mat_lower = material_name.lower()
     symbol = None
     if "aluminum" in mat_lower or "alumin" in mat_lower:

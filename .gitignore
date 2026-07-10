@@ -1,0 +1,19 @@
+# Python caching
+__pycache__/
+*.pyc
+**/*.pyc
+**/__pycache__/
+
+# Local configuration and credentials
+.env
+settings.json
+
+# Local databases
+history.db
+
+# Output exports
+*.pdf
+*.stp
+*.xlsx
+*.csv
+!materials.csv

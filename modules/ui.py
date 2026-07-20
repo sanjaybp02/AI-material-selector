@@ -102,11 +102,11 @@ button[kind="secondary"] {{
 
 /* ── Compact guided tour utility button ── */
 div.st-key-manual_tour_btn {{
-    position: fixed;
-    top: 0.85rem;
-    right: 4.35rem;
-    z-index: 1000;
-    width: auto;
+    position: fixed !important;
+    top: 0.85rem !important;
+    right: 4.35rem !important;
+    z-index: 1000 !important;
+    width: auto !important;
     margin: 0 !important;
 }}
 div.st-key-manual_tour_btn button {{

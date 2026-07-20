@@ -24,7 +24,6 @@ from modules.ui import (
     render_empty_state, render_confidence_bar, render_pros_cons,
     render_sidebar_status, render_footer, render_tour_banner,
 )
-from modules.cad_export import generate_step_file
 
 SETTINGS_FILE = "settings.json"
 MODEL_OPTIONS = [
@@ -182,9 +181,8 @@ def render_lite_results(r, currency, unit_system):
         r["result"]["total_cost"], mass_display, r["part_volume"], currency,
         r.get("properties"), carbon_val, carbon_unit
     )
-    step_data = generate_step_file(r["exact_name"])
 
-    c_btn1, c_btn2, c_btn3 = st.columns(3)
+    c_btn1, c_btn2 = st.columns(2)
     with c_btn1:
         st.download_button(
             "Download PDF report", data=pdf_bytes,
@@ -192,13 +190,6 @@ def render_lite_results(r, currency, unit_system):
             use_container_width=True,
         )
     with c_btn2:
-        st.download_button(
-            "Download STEP CAD", data=step_data,
-            file_name=f"Specimen_{r['exact_name'].replace(' ', '_')}.stp", mime="application/step",
-            use_container_width=True,
-            help="Download standard 10x10x100mm solid block specimen for CAD import.",
-        )
-    with c_btn3:
         if st.button("View Datasheet", use_container_width=True):
             render_datasheet(r.get("properties", {}))
 
@@ -263,9 +254,8 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
                     item["result"]["total_cost"], mass_display, item["part_volume"], currency,
                     item.get("properties"), carbon_val, carbon_unit
                 )
-                step_data = generate_step_file(item["exact_name"])
                 
-                c_btn1, c_btn2, c_btn3 = st.columns(3)
+                c_btn1, c_btn2 = st.columns(2)
                 with c_btn1:
                     st.download_button(
                         f"PDF — {item['exact_name']}", data=pdf_bytes,
@@ -274,14 +264,6 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
                         use_container_width=True,
                     )
                 with c_btn2:
-                    st.download_button(
-                        f"STEP — {item['exact_name']}", data=step_data,
-                        file_name=f"Specimen_{item['exact_name'].replace(' ', '_')}.stp",
-                        mime="application/step", key=f"step_{rank}",
-                        use_container_width=True,
-                        help="Download standard 10x10x100mm solid block specimen for CAD import.",
-                    )
-                with c_btn3:
                     if st.button(f"Datasheet", key=f"ds_{rank}", use_container_width=True):
                         render_datasheet(item.get("properties", {}))
 
@@ -412,20 +394,16 @@ if st.session_state.get("tour_active"):
     st.markdown('<div class="tour-backdrop"></div>', unsafe_allow_html=True)
 
 # Main layout
-header_col, action_col = st.columns([5.8, 1.25])
-with header_col:
-    render_hero("Lite" if not is_advanced else "Advanced")
-with action_col:
-    st.markdown('<div style="height: 0.55rem;"></div>', unsafe_allow_html=True)
-    if st.button(
-        "Tour",
-        key="manual_tour_btn",
-        help="Open the guided tour",
-        use_container_width=True,
-    ):
-        st.session_state["tour_active"] = True
-        st.session_state["tour_step"] = 1
-        st.rerun()
+if st.button(
+    "Tour",
+    key="manual_tour_btn",
+    help="Open the guided tour",
+):
+    st.session_state["tour_active"] = True
+    st.session_state["tour_step"] = 1
+    st.rerun()
+
+render_hero("Lite" if not is_advanced else "Advanced")
 
 st.caption("ENGINEERING INTELLIGENCE DASHBOARD")
 
@@ -629,7 +607,8 @@ has_lite = not is_advanced and "lite_result" in st.session_state
 has_advanced = is_advanced and st.session_state.get("advanced_results")
 
 with st.container(border=True):
-    st.markdown('<div id="tour-step-3-anchor"></div>', unsafe_allow_html=True)
+    anchor_num = "3" if is_advanced else "2"
+    st.markdown(f'<div id="tour-step-{anchor_num}-anchor"></div>', unsafe_allow_html=True)
     if st.session_state.get("tour_active") and st.session_state.get("tour_step") == (3 if is_advanced else 2):
         total = 3 if is_advanced else 2
         desc = "Review AI recommendations, download PDF reports, and export 3D CAD STEP files. You can also view interactive radar/scatter/heatmap visuals and ask follow-up questions in the chat panel below." if is_advanced else "Review the recommended material, download the engineering PDF report, and export the 3D CAD STEP model."

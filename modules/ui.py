@@ -102,8 +102,12 @@ button[kind="secondary"] {{
 
 /* ── Compact guided tour utility button ── */
 div.st-key-manual_tour_btn {{
-    display: flex;
-    justify-content: flex-end;
+    position: fixed;
+    top: 0.85rem;
+    right: 4.35rem;
+    z-index: 1000;
+    width: auto;
+    margin: 0 !important;
 }}
 div.st-key-manual_tour_btn button {{
     min-height: 2rem !important;
@@ -112,6 +116,7 @@ div.st-key-manual_tour_btn button {{
     font-size: 0.75rem !important;
     line-height: 1 !important;
     white-space: nowrap !important;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset !important;
 }}
 
 /* ── Tabs ── */
@@ -367,6 +372,13 @@ button:has(div[class*="spinner"]) div {{
     0% {{ transform: rotate(0deg); }}
     100% {{ transform: rotate(360deg); }}
 }}
+/* Hide default Streamlit deploy button and header */
+[data-testid="stHeader"] {
+    display: none !important;
+}
+.stAppDeployButton, [data-testid="stAppDeployButton"] {
+    display: none !important;
+}
 </style>
 """,
         unsafe_allow_html=True,
@@ -516,17 +528,37 @@ def render_footer():
 
 def render_tour_banner(step_num: int, total_steps: int, title: str, text: str, key_prefix: str):
     """Render a premium green-bordered guided tour card with compact controls and auto-scroll."""
-    # Render scroll trigger using the onerror image hack
-    scroll_hack = f"""
-    <img src="x" onerror="
-        var el = document.getElementById('tour-step-{step_num}-anchor');
-        if (el) {{
-            el.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
-        }}
-    " style="display:none;">
+    # Render scroll trigger using the Streamlit HTML component to bypass Markdown security sanitization
+    js_code = f"""
+    <script>
+        (function() {{
+            var attempts = 0;
+            var interval = setInterval(function() {{
+                attempts++;
+                var doc = document;
+                try {{
+                    if (window.parent && window.parent.document) doc = window.parent.document;
+                }} catch(e) {{}}
+                try {{
+                    if (window.top && window.top.document) doc = window.top.document;
+                }} catch(e) {{}}
+                
+                var el = doc.getElementById('tour-step-{step_num}-anchor');
+                if (el) {{
+                    console.log('Found tour anchor tour-step-{step_num}-anchor on attempt ' + attempts);
+                    el.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+                    clearInterval(interval);
+                }} else if (attempts >= 30) {{
+                    console.log('Failed to find tour anchor after 30 attempts');
+                    clearInterval(interval);
+                }}
+            }}, 100);
+        }})();
+    </script>
     """
+    st.components.v1.html(js_code, height=0, width=0)
     
-    html_content = f"""{scroll_hack}
+    html_content = f"""
 <div class="tour-banner-active" style="
     border: 2px solid #2ea44f; 
     background: rgba(46, 164, 79, 0.05); 

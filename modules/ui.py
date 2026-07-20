@@ -373,12 +373,12 @@ button:has(div[class*="spinner"]) div {{
     100% {{ transform: rotate(360deg); }}
 }}
 /* Hide default Streamlit deploy button and header */
-[data-testid="stHeader"] {
+[data-testid="stHeader"] {{
     display: none !important;
-}
-.stAppDeployButton, [data-testid="stAppDeployButton"] {
+}}
+.stAppDeployButton, [data-testid="stAppDeployButton"] {{
     display: none !important;
-}
+}}
 </style>
 """,
         unsafe_allow_html=True,

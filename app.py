@@ -24,6 +24,7 @@ from modules.ui import (
     inject_theme, render_hero, section_header, render_status_banner,
     render_empty_state, render_confidence_bar, render_pros_cons,
     render_sidebar_status, render_footer, render_tour_banner,
+    inject_clarity,
 )
 
 SETTINGS_FILE = "settings.json"
@@ -345,6 +346,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 inject_theme()
+inject_clarity()
 
 # Load main application data
 settings = load_settings()

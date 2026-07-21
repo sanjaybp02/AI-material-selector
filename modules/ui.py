@@ -501,7 +501,7 @@ def render_sidebar_status(api_connected: bool, material_count: int):
 
 def render_footer():
     st.markdown(
-        '<div class="app-footer">AI Material Selector · Sanjay BP</div>',
+        '<div class="app-footer">made with ❤️ by sanjay_bp</div>',
         unsafe_allow_html=True,
     )
 

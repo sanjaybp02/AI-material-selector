@@ -103,8 +103,8 @@ button[kind="secondary"] {{
 /* ── Compact guided tour utility button ── */
 div.st-key-manual_tour_btn {{
     position: fixed !important;
-    top: 0.85rem !important;
-    right: 4.35rem !important;
+    top: 4.5rem !important;
+    right: 2rem !important;
     z-index: 1000 !important;
     width: auto !important;
     margin: 0 !important;
@@ -281,8 +281,8 @@ div[data-testid="stChatMessage"] {{
 }}
 .app-footer {{
     position: fixed !important;
-    top: 1.25rem !important;
-    right: 8.5rem !important;
+    top: 4.85rem !important;
+    right: 6.8rem !important;
     font-size: 0.75rem !important;
     color: {TEXT_MUTED} !important;
     background: transparent !important;

@@ -583,31 +583,23 @@ def render_tour_banner(step_num: int, total_steps: int, title: str, text: str, k
 
 
 def inject_clarity():
-    """Inject Microsoft Clarity tracking script with dual local and parent frame support."""
+    """Inject Microsoft Clarity tracking script directly into the parent window context."""
     js_code = """
     <script type="text/javascript">
-        (function(c,l,a,r,i,t,y){
-            c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-            t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-            y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-            
-            try {
-                if (window.parent && window.parent.document) {
-                    var p_doc = window.parent.document;
-                    if (!p_doc.getElementById('clarity-parent-script')) {
-                        var p_t = p_doc.createElement(r);
-                        p_t.id = 'clarity-parent-script';
-                        p_t.async = 1;
-                        p_t.src = "https://www.clarity.ms/tag/"+i;
-                        var p_y = p_doc.getElementsByTagName(r)[0];
-                        if (p_y) p_y.parentNode.insertBefore(p_t, p_y);
-                        else p_doc.head.appendChild(p_t);
-                    }
-                }
-            } catch(e) {
-                console.log("Clarity parent context injection skipped:", e);
-            }
-        })(window, document, "clarity", "script", "xpyroe7f7m");
+        try {
+            (function(c,l,a,r,i,t,y){
+                c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+                y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+            })(window.parent, window.parent.document, "clarity", "script", "xpyroe7f7m");
+        } catch(e) {
+            console.log("Parent context blocked. Falling back to local iframe context.");
+            (function(c,l,a,r,i,t,y){
+                c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+                y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+            })(window, document, "clarity", "script", "xpyroe7f7m");
+        }
     </script>
     """
     st.components.v1.html(js_code, height=0, width=0)

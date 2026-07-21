@@ -271,7 +271,11 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
     with tab_charts:
         if rec_names:
             chart_df = st.session_state.get("last_edited_df", df_display)
-            st.plotly_chart(radar_chart(chart_df, rec_names, unit_system), use_container_width=True)
+            st.plotly_chart(
+                radar_chart(chart_df, rec_names, unit_system),
+                use_container_width=True,
+                key="plotly_radar_chart"
+            )
             
             st.markdown("##### Custom Scatter Telemetry")
             yield_c, density_c = get_yield_col(unit_system), get_density_col(unit_system)
@@ -291,10 +295,18 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
                     index=avail_cols.index(yield_c) if yield_c in avail_cols else 0,
                     key="scatter_y_axis"
                 )
-            st.plotly_chart(scatter_plot(chart_df, x_axis, y_axis, rec_names), use_container_width=True)
+            st.plotly_chart(
+                scatter_plot(chart_df, x_axis, y_axis, rec_names),
+                use_container_width=True,
+                key="plotly_scatter_plot"
+            )
             
             with st.expander("Property heatmap"):
-                st.plotly_chart(property_heatmap(chart_df, unit_system), use_container_width=True)
+                st.plotly_chart(
+                    property_heatmap(chart_df, unit_system),
+                    use_container_width=True,
+                    key="plotly_heatmap"
+                )
         else:
             render_empty_state("", "No chart data", "Run an analysis to generate visual comparisons.")
 
@@ -308,7 +320,11 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
             max_selections=4,
         )
         if len(selected) >= 2:
-            st.plotly_chart(radar_chart(chart_df, selected, unit_system), use_container_width=True)
+            st.plotly_chart(
+                radar_chart(chart_df, selected, unit_system),
+                use_container_width=True,
+                key="plotly_radar_compare"
+            )
         elif selected:
             st.info("Select at least two materials to compare.")
         else:

@@ -341,6 +341,16 @@ app_mode = settings.get("mode", "Advanced")
 # Sidebar
 with st.sidebar:
     st.markdown("### Settings")
+    if st.button(
+        "Start Guided Tour",
+        key="manual_tour_btn",
+        help="Open the guided onboarding tour",
+        use_container_width=True,
+    ):
+        st.session_state["tour_active"] = True
+        st.session_state["tour_step"] = 1
+        st.rerun()
+
     api_key = st.text_input(
         "Gemini API key",
         type="password",
@@ -394,15 +404,6 @@ if st.session_state.get("tour_active"):
     st.markdown('<div class="tour-backdrop"></div>', unsafe_allow_html=True)
 
 # Main layout
-if st.button(
-    "Tour",
-    key="manual_tour_btn",
-    help="Open the guided tour",
-):
-    st.session_state["tour_active"] = True
-    st.session_state["tour_step"] = 1
-    st.rerun()
-
 render_hero("Lite" if not is_advanced else "Advanced")
 
 st.caption("ENGINEERING INTELLIGENCE DASHBOARD")

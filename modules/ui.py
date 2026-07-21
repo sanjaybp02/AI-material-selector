@@ -368,11 +368,14 @@ button:has(div[class*="spinner"]) div {{
     0% {{ transform: rotate(0deg); }}
     100% {{ transform: rotate(360deg); }}
 }}
-/* Hide default Streamlit deploy button and header */
+/* Keep header for sidebar toggle, but make background transparent and hide deploy/options menu */
 [data-testid="stHeader"] {{
+    background: transparent !important;
+}}
+[data-testid="stDecoration"] {{
     display: none !important;
 }}
-.stAppDeployButton, [data-testid="stAppDeployButton"] {{
+.stAppDeployButton, [data-testid="stAppDeployButton"], [data-testid="stHeaderActionElements"], #MainMenu {{
     display: none !important;
 }}
 </style>

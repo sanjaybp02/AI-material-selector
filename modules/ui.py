@@ -263,12 +263,15 @@ div[data-testid="stChatMessage"] {{
     color: #c9d1d9;
 }}
 .app-footer {{
-    text-align: center;
-    padding: 24px 0 12px 0;
-    font-size: 0.75rem;
-    color: {TEXT_MUTED};
-    border-top: 1px solid var(--accent-border);
-    margin-top: 40px;
+    position: fixed !important;
+    bottom: 3.2rem !important;
+    right: 1.5rem !important;
+    font-size: 0.75rem !important;
+    color: {TEXT_MUTED} !important;
+    background: transparent !important;
+    z-index: 1000 !important;
+    pointer-events: none !important;
+    text-align: right !important;
 }}
 
 /* ── Tour highlights & spotlight ── */

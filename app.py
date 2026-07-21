@@ -1,3 +1,4 @@
+# Hot-reload trigger: 2026-07-21
 import os
 import json
 from dotenv import load_dotenv

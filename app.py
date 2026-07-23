@@ -231,7 +231,7 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
         for rank, item in enumerate(processed):
             rank_label = f"Rank {rank + 1}"
             mass_display, mass_unit = format_mass(item["result"], unit_system)
-            with st.expander(f"{rank_label}: {item['exact_name']} — {item['confidence']}% confidence", expanded=(rank == 0)):
+            with st.expander(f"{rank_label}: {item['exact_name']} — {item['confidence']}% confidence", expanded=True):
                 m1, m2, m3, m4 = st.columns(4)
                 m1.metric("Material", item["exact_name"])
                 m2.metric("Confidence", f"{item['confidence']}%")
@@ -303,7 +303,7 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
                 key="plotly_scatter_plot"
             )
             
-            with st.expander("Property heatmap"):
+            with st.expander("Property heatmap", expanded=True):
                 st.plotly_chart(
                     property_heatmap(chart_df, unit_system),
                     use_container_width=True,
@@ -497,7 +497,7 @@ if is_advanced:
             )
         section_header("2", "Physical constraints", "Narrow the database before AI ranking.")
         filtered_df, filter_vals = render_filters(df_display, mode, unit_system, settings)
-        with st.expander("Candidate database", expanded=False):
+        with st.expander("Candidate database", expanded=True):
             st.caption("Edit values for what-if scenarios — changes apply to this session only.")
             filtered_df = st.data_editor(filtered_df, hide_index=True, use_container_width=True)
 else:

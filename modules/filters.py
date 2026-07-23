@@ -181,7 +181,7 @@ def render_filters(df, mode, unit_system, settings):
         filtered = filtered[filtered[yield_col] >= min_yield]
 
     # Advanced filters in expander
-    with st.expander("Advanced constraints", expanded=False):
+    with st.expander("Advanced constraints", expanded=True):
         ac1, ac2 = st.columns(2)
 
         with ac1:

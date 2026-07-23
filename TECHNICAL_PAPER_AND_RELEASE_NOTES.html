@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Material Selector - Technical System Paper & Release Notes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+    </script>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #111827;
+            --border-color: #1f2937;
+            --text-color: #f3f4f6;
+            --text-muted: #9ca3af;
+            --accent-primary: #06b6d4;
+            --accent-secondary: #3b82f6;
+            --accent-glow: rgba(6, 182, 212, 0.15);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 40px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 40px var(--accent-glow);
+        }
+
+        /* Print styling to export cleanly as PDF */
+        @media print {
+            body {
+                background-color: #ffffff;
+                color: #000000;
+            }
+            .container {
+                margin: 0;
+                padding: 0;
+                border: none;
+                box-shadow: none;
+                max-width: 100%;
+            }
+            .no-print {
+                display: none !important;
+            }
+            pre, code, pre.mermaid {
+                background: #f3f4f6 !important;
+                border: 1px solid #d1d5db !important;
+                color: #000000 !important;
+            }
+        }
+
+        /* Action bar for downloads */
+        .action-bar {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 20px;
+            gap: 12px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            font-weight: 500;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 0 12px var(--accent-primary);
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+
+        h1 {
+            font-size: 32px;
+            background: linear-gradient(to right, #00f2fe, #4facfe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        h2 {
+            font-size: 22px;
+            color: #06b6d4;
+            margin-top: 30px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        h3 {
+            font-size: 18px;
+            color: #3b82f6;
+            margin-top: 20px;
+        }
+
+        p {
+            color: var(--text-color);
+            margin: 10px 0;
+        }
+
+        strong {
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        hr {
+            border: 0;
+            height: 1px;
+            background: var(--border-color);
+            margin: 30px 0;
+        }
+
+        ul, ol {
+            padding-left: 20px;
+            margin: 10px 0;
+        }
+
+        li {
+            margin-bottom: 8px;
+            color: var(--text-color);
+        }
+
+        /* Code Styling */
+        pre {
+            background-color: #0f172a;
+            border: 1px solid var(--border-color);
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: #38bdf8;
+            padding: 2px 6px;
+            background: rgba(56, 189, 248, 0.1);
+            border-radius: 4px;
+        }
+
+        pre code {
+            padding: 0;
+            background: none;
+            color: #e2e8f0;
+            font-size: 13.5px;
+        }
+
+        /* Mermaid Styling */
+        pre.mermaid {
+            background-color: #0f172a;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        /* Table styling (if parsed) */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            text-align: left;
+        }
+
+        th {
+            background: rgba(6, 182, 212, 0.1);
+            color: var(--accent-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="action-bar no-print">
+            <button onclick="window.print()" class="btn">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2m-12 0v5h12v-5M6 14h12"></path>
+                </svg>
+                Save as PDF / Print
+            </button>
+        </div>
+        
+        <h1>Technical System Paper &amp; Release Notes v1.0.0: AI-Powered Material Selection Engine</h1>
+<br/>
+<strong>Author:</strong> Sanjay BP  
+<strong>Project:</strong> AI Material Selector  
+<strong>Date:</strong> July 2026  
+<br/>
+<hr>
+<br/>
+<h2>1. Abstract</h2>
+<p>In engineering design, material selection is a high-dimensional optimization problem. Engineers must simultaneously balance mechanical properties (Yield Strength, Tensile Strength), thermal tolerances (Max Operating Temperature), physical properties (Density), and economic factors (Volatile commodity market pricing). </p>
+<br/>
+<p>This paper introduces the <strong>AI Material Selector</strong>, a system that combines a deterministic localized constraint solver with the cognitive reasoning capabilities of Google Gemini. The system automates material selection by preprocessing a localized dataset, performing multi-agent-like reasoning over conflicting trade-offs (e.g., strength-to-weight ratio vs. cost), executing real-time pricing queries via a hybrid API-estimation engine, and rendering multi-dimensional telemetry (radar, scatter, heatmaps) to assist decision-making. </p>
+<br/>
+<hr>
+<br/>
+<h2>2. Introduction &amp; Problem Statement</h2>
+<p>Engineers typically rely on static databases (e.g., Granta Design) or flat spreadsheets to find materials. However, these systems fall short in two areas:</p>
+<ol>
+  <li><strong>Semantic Search Limitations:</strong> Engineers often describe requirements qualitatively (e.g., *"I need a lightweight, impact-resistant material for a drone frame flying in high-temperature environments"*). Static databases cannot parse this intent.</li>
+  <li><strong>Dynamic Volatility:</strong> Material prices fluctuate daily. Static databases fail to account for current market pricing, leading to inaccurate part-cost estimates during early-stage prototyping.</li>
+</ol>
+<hr>
+<br/>
+<h2>3. System Architecture &amp; Component Mapping</h2>
+<br/>
+<p>The application is built as a modular python system orchestrated via a Streamlit frontend. The diagram below illustrates the system architecture:</p>
+<br/>
+<pre class="mermaid">graph TD
+    User([User / Engineer]) -->|Input Constraints / Prompts| UI[Streamlit UI Orchestrator: app.py]
+    UI -->|Loads & Converts Units| DL[Data Loader: modules/data_loader.py]
+    DL <-->|Reads| CSV[(materials.csv)]
+    
+    UI -->|Render UI Sliders| FI[Filters: modules/filters.py]
+    UI -->|Selects Templates| TM[Templates Manager: modules/templates.py]
+    TM <-->|Reads/Writes| JSON[(templates.json)]
+    
+    UI -->|Prompt + Context| AI[AI Engine: modules/ai_engine.py]
+    AI <-->|Generates Inferences| Gemini[Google Gemini Flash/Pro API]
+    
+    UI -->|Compute Part Cost| CE[Cost Engine: modules/cost_engine.py]
+    CE -->|Live Spot Prices| MP[MetalPrice API]
+    CE -->|Fallback Prices| Gemini
+    
+    UI -->|Pass Filtered Data| CH[Charts Engine: modules/charts.py]
+    CH -->|Renders Plotly| UI
+    
+    UI -->|Compile Dossier| PDF[PDF Report: modules/pdf_report.py]
+    PDF -->|Download Dossier| User</pre>
+<br/>
+<h3>Module Descriptions:</h3>
+<ol>
+  <li><strong><code>app.py</code></strong>: The central controller and UI manager. Handles state machine management (e.g., switching between Lite and Advanced modes) and sidebar controls.</li>
+  <li><strong><code>modules/data_loader.py</code></strong>: Implements robust Pandas preprocessing. Loads <code>materials.csv</code>, handles missing columns, and converts unit systems (Imperial/Metric).</li>
+  <li><strong><code>modules/filters.py</code></strong>: A deterministic constraint engine that renders sliders and filters data matrices based on mathematical bounds.</li>
+  <li><strong><code>modules/ai_engine.py</code></strong>: Standardizes system prompts, context window formatting, and chat history. Interacts directly with the <code>google-genai</code> SDK.</li>
+  <li><strong><code>modules/cost_engine.py</code></strong>: The pricing computation module. Implements a fallback logic chain: it first attempts to fetch live market rates via the MetalPrice API; if unavailable or unsupported, it queries Gemini for real-time market estimates, falling back to static CSV data.</li>
+  <li><strong><code>modules/charts.py</code></strong>: Generates interactive visualization models using Plotly (Radar Charts, Scatter Plots, and Property Heatmaps).</li>
+  <li><strong><code>modules/pdf_report.py</code></strong>: A report generation utility using FPDF2 to generate formal engineering dossiers containing charts, reasoning, and cost breakdowns.</li>
+  <li><strong><code>modules/templates.py</code></strong>: Manages custom prompt presets stored in a local JSON structure.</li>
+</ol>
+<hr>
+<br/>
+<h2>4. System Workflows</h2>
+<br/>
+<p>The AI Material Selector relies on four primary operational workflows.</p>
+<br/>
+<h3>Workflow A: AI-Reasoned Natural Language Recommendation</h3>
+<p>This workflow processes open-ended prompts (e.g., *"I need a strong but cheap material for a bike pedal"*).</p>
+<br/>
+<pre class="mermaid">sequenceDiagram
+    autonumber
+    actor User
+    participant App as app.py
+    participant Data as data_loader.py
+    participant AI as ai_engine.py
+    participant Gemini as Gemini API
+    
+    User->>App: Submits Prompt & API Key
+    App->>Data: Request full dataset
+    Data-->>App: Returns DataFrame
+    App->>AI: Prepare System Prompt & Context (DataFrame JSON)
+    AI->>Gemini: Sends System Prompt + DataFrame + User Query
+    Note over Gemini: Gemini evaluates mechanical constraints,<br/>computes strength-to-weight, and ranks candidates.
+    Gemini-->>AI: Returns formatted markdown response (MD + structured tables)
+    AI-->>App: Pass clean markdown
+    App->>User: Render markdown and comparative breakdown</pre>
+<br/>
+<h3>Workflow B: Parametric Filtering &amp; Multi-Material Comparison</h3>
+<p>This workflow handles quantitative, multi-variable engineering constraints.</p>
+<br/>
+<pre class="mermaid">sequenceDiagram
+    autonumber
+    actor User
+    participant App as app.py
+    participant Filters as filters.py
+    participant Charts as charts.py
+    
+    User->>App: Adjusts sliders (Yield Strength, Density, Temp)
+    App->>Filters: Run data filtration
+    Filters-->>App: Return filtered DataFrame
+    App->>Charts: Generate telemetry objects (filtered DF)
+    Note over Charts: Computes normalized axes for Radar Charts<br/>and coordinates for Scatter Plots.
+    Charts-->>App: Return Plotly Fig objects
+    App->>User: Display dynamic data matrix and interactive Plotly charts</pre>
+<br/>
+<h3>Workflow C: Hybrid Cost Engineering</h3>
+<p>This workflow computes actual manufacturing part costs based on dimensions and density.</p>
+<br/>
+<pre class="mermaid">sequenceDiagram
+    autonumber
+    actor User
+    participant App as app.py
+    participant Cost as cost_engine.py
+    participant API as MetalPrice API
+    participant Gemini as Gemini API
+
+    User->>App: Enters Part Volume (cm³) and target material
+    App->>Cost: Calculate part cost (Volume, Material Density)
+    alt Material is Metal & API Key is valid
+        Cost->>API: Query live commodity spot price
+        API-->>Cost: Return current price/g
+    else API Call Fails or Material is Non-Metal
+        Cost->>Gemini: Query for estimated current market price/g
+        Gemini-->>Cost: Return LLM-reasoned estimate
+    end
+    Note over Cost: Part Cost = Volume * Density * Price/g
+    Cost-->>App: Return final price estimation
+    App->>User: Display cost estimation cards & breakdown charts</pre>
+<br/>
+<h3>Workflow D: Dossier Export and Template Storage</h3>
+<p>This workflow allows users to save prompts and generate offline documents.</p>
+<br/>
+<pre class="mermaid">graph LR
+    A[User Action] --> B{Action Type}
+    B -->|Save Template| C[templates.py]
+    C -->|Write JSON| D[(templates.json)]
+    B -->|Export Dossier| E[pdf_report.py]
+    E -->|Fetch current view states & charts| F[FPDF2 Generation Engine]
+    F -->|Compile PDF file| G[Downloadable PDF Dossier]</pre>
+<br/>
+<hr>
+<br/>
+<h2>5. Release Notes v1.0.0 (Initial Public Release)</h2>
+<br/>
+<p>We are proud to announce the official release of <strong>AI Material Selector v1.0.0</strong>. This release transforms the application from a command-line script to an enterprise-grade tactical dashboard.</p>
+<br/>
+<h3>Key New Features</h3>
+<ul>
+  <li><strong>Dual Mode Architecture (Lite &amp; Advanced):</strong> Introduced a clean UI split. Lite Mode features a streamlined interface focused purely on quick AI answers. Advanced Mode displays engineering tools, dynamic sliders, and full chart grids.</li>
+  <li><strong>Dynamic Cost Estimator:</strong> Integrates live commodity prices via the <code>MetalPrice API</code> with fallbacks for plastics, ceramics, and composites using Google Gemini heuristics.</li>
+  <li><strong>Interactive Telemetry Dashboard:</strong> Integrated Plotly charts including:</li>
+</ul>    *   *Radar Chart:* To visually compare multiple candidate materials across multiple axes (Machinability, Cost, Strength, Temp, Density).
+<p>    *   *Property Scatter Plot:* Yield Strength vs. Density with bubble sizing mapping to cost.</p>
+<ul>
+  <li><strong>PDF Dossier Compilation:</strong> Generates styled engineering reports containing the selection matrices, AI reasoning, and cost estimates.</li>
+  <li><strong>JSON-based Custom Vector Templates:</strong> Allows users to save complex constraint layouts and prompts as reusable templates.</li>
+</ul>
+<h3>Visual &amp; Performance Refinements</h3>
+<ul>
+  <li><strong>Premium Tactical UI Theme:</strong> Customized CSS injecting <code>Inter</code> and <code>JetBrains Mono</code> fonts, modern glassmorphism containers, subtle grey borders, and styled sidebar control groups.</li>
+  <li><strong>Google Gemini SDK Migration:</strong> Updated backend to target the new <code>google-genai</code> SDK, utilizing <code>gemini-1.5-flash</code> for high-speed queries and <code>gemini-1.5-pro</code> for complex structural reasoning.</li>
+  <li><strong>Unit-Conversion Pipeline:</strong> Automates data unit conversion (e.g., MPa to ksi, g/cm³ to lb/in³) under the hood.</li>
+</ul>
+<hr>
+<br/>
+<h2>6. Future Roadmap</h2>
+<ul>
+  <li><strong>3D STL Viewer:</strong> Render part files directly inside Streamlit to calculate target volume automatically from geometry.</li>
+  <li><strong>Cloud Templates Synchronization:</strong> Sync user prompt libraries across machines using cloud databases.</li>
+  <li><strong>Database Expansion:</strong> Adding carbon fiber composites, high-temperature superalloys, and 3D printing filaments (PLA, PETG, ABS, Nylon) to the dataset.</li>
+</ul>
+    </div>
+</body>
+</html>

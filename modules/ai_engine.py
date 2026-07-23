@@ -4,11 +4,18 @@ import time
 
 def call_gemini_with_retry(client, model_name, contents):
     """
-    Call Gemini generate_content with retries and stable fallback models on transient 503/429 errors.
+    Call Gemini generate_content with retries and stable fallback models on transient 503/429 errors
+    or model deprecation/404 errors.
     """
     models_to_try = [model_name]
-    # Standard stable fallbacks
-    fallbacks = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-3.1-flash-lite-preview"]
+    # Standard stable fallbacks (active Gemini models)
+    fallbacks = [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+        "gemini-2.5-pro",
+        "gemini-1.5-pro",
+    ]
     for f in fallbacks:
         if f not in models_to_try:
             models_to_try.append(f)
@@ -25,10 +32,18 @@ def call_gemini_with_retry(client, model_name, contents):
             except Exception as e:
                 last_err = e
                 err_str = str(e).lower()
+
+                # If model is deprecated / retired / 404 NOT_FOUND, immediately try next fallback model
+                is_not_found = any(x in err_str for x in [
+                    "404", "not_found", "no longer available", "not found", "deprecated"
+                ])
+                if is_not_found:
+                    break
+
                 # Check for transient rate limit or demand overload
                 is_transient = any(x in err_str for x in ["503", "429", "unavailable", "exhausted", "demand", "limit"])
                 if not is_transient:
-                    # If it's a bad API key or non-transient, raise immediately
+                    # If it's a bad API key or non-transient error, raise immediately
                     raise e
                 # Wait before retrying (exponential backoff)
                 time.sleep(1.0 + attempt * 1.5)

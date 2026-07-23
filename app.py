@@ -29,9 +29,10 @@ from modules.ui import (
 
 SETTINGS_FILE = "settings.json"
 MODEL_OPTIONS = [
-    "gemini-flash-latest", "gemini-pro-latest",
     "gemini-2.5-flash", "gemini-2.5-pro",
-    "gemini-3.1-flash-lite-preview", "gemini-3.1-pro-preview",
+    "gemini-2.0-flash", "gemini-2.0-flash-lite",
+    "gemini-1.5-flash", "gemini-1.5-pro",
+    "gemini-flash-latest", "gemini-pro-latest",
 ]
 COST_OPTIONS = ["Use CSV Database Pricing", "Use AI Market Estimation", "Use Live MetalPrice API"]
 

@@ -1,3 +1,15 @@
+---
+title: AI Material Selector
+emoji: ⚙️
+colorFrom: blue
+colorTo: indigo
+sdk: streamlit
+sdk_version: 1.41.0
+app_file: app.py
+pinned: false
+license: mit
+---
+
 # ⚙️ AI Material Selector
 
 **AI Material Selector** is a tactical, engineering-focused Streamlit application that leverages the Google Gemini AI engine to help engineers, designers, and manufacturers find the optimal materials for their projects based on physical constraints, cost limits, and natural language requirements.

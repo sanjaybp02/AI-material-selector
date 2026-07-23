@@ -81,6 +81,8 @@ def render_filters(df, mode, unit_system, settings):
     fatigue_col = get_fatigue_col(unit_system)
     carbon_col = get_carbon_col(unit_system)
 
+    is_reset = st.session_state.get("reset_sliders_active", False)
+
     filtered = df.copy()
     filter_meta = {}
     summary_meta = {}
@@ -142,11 +144,12 @@ def render_filters(df, mode, unit_system, settings):
             temp_min_val = int(df[temp_col].min())
             temp_max_val = int(df[temp_col].max())
             unit_label = "°F" if unit_system == "Imperial" else "°C"
+            val_temp = temp_min_val if is_reset else max(st.session_state.get("pack_min_temp", settings.get("min_temp", temp_min_val)), temp_min_val)
             min_temp = st.slider(
                 f"Minimum operating temperature ({unit_label})",
                 min_value=temp_min_val,
                 max_value=temp_max_val,
-                value=max(st.session_state.get("pack_min_temp", settings.get("min_temp", temp_min_val)), temp_min_val),
+                value=val_temp,
                 step=10,
                 help="Materials must survive at or above this temperature.",
             )
@@ -161,11 +164,12 @@ def render_filters(df, mode, unit_system, settings):
             yield_min_val = int(df[yield_col].min())
             yield_max_val = int(df[yield_col].max())
             unit_label = "psi" if unit_system == "Imperial" else "MPa"
+            val_yield = yield_min_val if is_reset else max(st.session_state.get("pack_min_yield", settings.get("min_yield", yield_min_val)), yield_min_val)
             min_yield = st.slider(
                 f"Minimum yield strength ({unit_label})",
                 min_value=yield_min_val,
                 max_value=yield_max_val,
-                value=max(st.session_state.get("pack_min_yield", settings.get("min_yield", yield_min_val)), yield_min_val),
+                value=val_yield,
                 step=10 if unit_system == "Metric" else 1000,
                 help="Minimum structural strength required.",
             )
@@ -182,6 +186,16 @@ def render_filters(df, mode, unit_system, settings):
 
     # Advanced filters in expander
     with st.expander("Advanced constraints", expanded=True):
+        adv_h1, adv_h2 = st.columns([0.65, 0.35])
+        with adv_h1:
+            st.caption("Fine-tune physical bounds & compliance settings")
+        with adv_h2:
+            if st.button("🔄 Reset sliders to default", key="reset_adv_sliders", help="Reset all sliders and physical constraints to default values", use_container_width=True):
+                st.session_state["reset_sliders_active"] = True
+                for k in ["pack_min_temp", "pack_min_yield", "pack_max_density", "pack_max_carbon", "pack_bio_compatible"]:
+                    st.session_state.pop(k, None)
+                st.rerun()
+
         ac1, ac2 = st.columns(2)
 
         with ac1:
@@ -189,11 +203,12 @@ def render_filters(df, mode, unit_system, settings):
                 d_unit = "lb/in³" if unit_system == "Imperial" else "g/cm³"
                 d_max = float(df[density_col].max())
                 d_min = float(df[density_col].min())
+                val_density = d_max if is_reset else min(st.session_state.get("pack_max_density", settings.get("max_density", d_max)), d_max)
                 max_density = st.slider(
                     f"Maximum density ({d_unit})",
                     min_value=d_min,
                     max_value=d_max,
-                    value=min(st.session_state.get("pack_max_density", d_max), d_max),
+                    value=val_density,
                     step=0.01 if unit_system == "Imperial" else 0.5,
                     help="Lower density means lighter parts.",
                 )
@@ -206,11 +221,12 @@ def render_filters(df, mode, unit_system, settings):
                 mod_unit = "Mpsi" if unit_system == "Imperial" else "GPa"
                 mod_min = float(df[modulus_col].min())
                 mod_max = float(df[modulus_col].max())
+                val_modulus = mod_min if is_reset else max(settings.get("min_modulus", mod_min), mod_min)
                 min_modulus = st.slider(
                     f"Minimum elastic modulus ({mod_unit})",
                     min_value=mod_min,
                     max_value=mod_max,
-                    value=max(settings.get("min_modulus", mod_min), mod_min),
+                    value=val_modulus,
                     step=1.0 if unit_system == "Metric" else 0.5,
                     help="Higher modulus = stiffer material.",
                 )
@@ -223,11 +239,12 @@ def render_filters(df, mode, unit_system, settings):
                 fat_min_val = int(df[fatigue_col].min())
                 fat_max_val = int(df[fatigue_col].max())
                 f_unit = "psi" if unit_system == "Imperial" else "MPa"
+                val_fatigue = fat_min_val if is_reset else max(settings.get("min_fatigue", fat_min_val), fat_min_val)
                 min_fatigue = st.slider(
                     f"Minimum fatigue strength ({f_unit})",
                     min_value=fat_min_val,
                     max_value=fat_max_val,
-                    value=max(settings.get("min_fatigue", fat_min_val), fat_min_val),
+                    value=val_fatigue,
                     step=10 if unit_system == "Metric" else 1000,
                     help="Materials must resist cyclic loading above this strength.",
                 )
@@ -239,11 +256,12 @@ def render_filters(df, mode, unit_system, settings):
             if "Hardness (Brinell)" in df.columns and not df["Hardness (Brinell)"].empty:
                 h_min = int(df["Hardness (Brinell)"].min())
                 h_max = int(df["Hardness (Brinell)"].max())
+                val_hardness = h_min if is_reset else max(settings.get("min_hardness", h_min), h_min)
                 min_hardness = st.slider(
                     "Minimum hardness (Brinell)",
                     min_value=h_min,
                     max_value=h_max,
-                    value=max(settings.get("min_hardness", h_min), h_min),
+                    value=val_hardness,
                     step=10,
                     help="Resistance to localized plastic deformation.",
                 )
@@ -254,11 +272,12 @@ def render_filters(df, mode, unit_system, settings):
 
         with ac2:
             if "Machinability (1-10)" in df.columns:
+                val_mach = 1 if is_reset else max(settings.get("min_mach", 1), 1)
                 min_mach = st.slider(
                     "Minimum machinability (1–10)",
                     min_value=1,
                     max_value=10,
-                    value=max(settings.get("min_mach", 1), 1),
+                    value=val_mach,
                     step=1,
                     help="10 = easiest to machine.",
                 )
@@ -271,11 +290,12 @@ def render_filters(df, mode, unit_system, settings):
                 tc_unit = "BTU/hr·ft·°F" if unit_system == "Imperial" else "W/m·K"
                 tc_min = float(df[thermal_col].min())
                 tc_max = float(df[thermal_col].max())
+                val_tc = tc_min if is_reset else max(settings.get("min_tc", tc_min), tc_min)
                 min_tc = st.slider(
                     f"Minimum thermal conductivity ({tc_unit})",
                     min_value=tc_min,
                     max_value=tc_max,
-                    value=max(settings.get("min_tc", tc_min), tc_min),
+                    value=val_tc,
                     step=1.0,
                     help="Important for heat sinks and exchangers.",
                 )
@@ -285,11 +305,12 @@ def render_filters(df, mode, unit_system, settings):
                 filtered = filtered[filtered[thermal_col] >= min_tc]
 
             if "Corrosion Resistance (1-10)" in df.columns:
+                val_corrosion = 1 if is_reset else max(settings.get("min_corrosion", 1), 1)
                 min_corrosion = st.slider(
                     "Minimum corrosion resistance (1–10)",
                     min_value=1,
                     max_value=10,
-                    value=max(settings.get("min_corrosion", 1), 1),
+                    value=val_corrosion,
                     step=1,
                     help="10 = extremely corrosion resistant.",
                 )
@@ -299,11 +320,12 @@ def render_filters(df, mode, unit_system, settings):
                 filtered = filtered[filtered["Corrosion Resistance (1-10)"] >= min_corrosion]
 
             if "Weldability (1-10)" in df.columns:
+                val_weld = 1 if is_reset else max(settings.get("min_weld", 1), 1)
                 min_weld = st.slider(
                     "Minimum weldability (1–10)",
                     min_value=1,
                     max_value=10,
-                    value=max(settings.get("min_weld", 1), 1),
+                    value=val_weld,
                     step=1,
                     help="10 = excellent weldability.",
                 )
@@ -313,11 +335,12 @@ def render_filters(df, mode, unit_system, settings):
                 filtered = filtered[filtered["Weldability (1-10)"] >= min_weld]
 
             if "UV Resistance (1-10)" in df.columns:
+                val_uv = 1 if is_reset else max(settings.get("min_uv", 1), 1)
                 min_uv = st.slider(
                     "Minimum UV resistance (1–10)",
                     min_value=1,
                     max_value=10,
-                    value=max(settings.get("min_uv", 1), 1),
+                    value=val_uv,
                     step=1,
                     help="10 = excellent resistance to UV degradation.",
                 )
@@ -330,11 +353,12 @@ def render_filters(df, mode, unit_system, settings):
                 c_unit = "lb CO2/lb" if unit_system == "Imperial" else "kg CO2/kg"
                 c_min = float(df[carbon_col].min())
                 c_max = float(df[carbon_col].max())
+                val_carbon = c_max if is_reset else float(st.session_state.get("pack_max_carbon", settings.get("max_carbon", c_max)))
                 max_carbon = st.slider(
                     f"Maximum embodied carbon ({c_unit})",
                     min_value=c_min,
                     max_value=c_max,
-                    value=float(st.session_state.get("pack_max_carbon", settings.get("max_carbon", c_max))),
+                    value=val_carbon,
                     step=0.1,
                     help="Lower embodied carbon is more sustainable.",
                 )
@@ -347,9 +371,10 @@ def render_filters(df, mode, unit_system, settings):
         ch_c1, ch_c2 = st.columns(2)
         with ch_c1:
             preset_bio = st.session_state.get("pack_bio_compatible", "No") == "Yes"
+            val_bio = False if is_reset else (preset_bio or settings.get("req_bio", False))
             req_bio = st.checkbox(
                 "Require bio-compatible materials",
-                value=preset_bio or settings.get("req_bio", False),
+                value=val_bio,
                 help="Only show materials certified bio-compatible.",
             )
             filter_meta["req_bio"] = req_bio
@@ -357,15 +382,19 @@ def render_filters(df, mode, unit_system, settings):
                 summary_meta["req_bio"] = True
                 filtered = filtered[filtered["Bio-compatible"] == "Yes"]
         with ch_c2:
+            val_food = False if is_reset else settings.get("req_food", False)
             req_food = st.checkbox(
                 "Require food-grade materials",
-                value=settings.get("req_food", False),
+                value=val_food,
                 help="Only show food-safe materials.",
             )
             filter_meta["req_food"] = req_food
             if req_food:
                 summary_meta["req_food"] = True
                 filtered = filtered[filtered["Food Grade"] == "Yes"]
+
+    if is_reset:
+        st.session_state["reset_sliders_active"] = False
 
     chips = _build_filter_chips(summary_meta, unit_system)
     render_filter_summary(chips)

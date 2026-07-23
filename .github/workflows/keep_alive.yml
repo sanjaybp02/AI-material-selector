@@ -2,21 +2,25 @@ name: Keep App Alive
 
 on:
   schedule:
-    # Run every 15 minutes to prevent Streamlit Cloud sleeping
-    - cron: '*/15 * * * *'
+    # Run every 10 minutes to ensure Streamlit Cloud never sleeps
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Streamlit App
+      - name: Ping Streamlit Cloud Application
         run: |
-          # Replace APP_URL with your deployed Streamlit Cloud URL (e.g. https://your-app.streamlit.app)
-          APP_URL="${{ secrets.APP_URL }}"
-          if [ -n "$APP_URL" ]; then
-            echo "Pinging $APP_URL..."
-            curl -s -f -L "$APP_URL" > /dev/null && echo "Ping successful!" || echo "Ping failed!"
-          else
-            echo "No APP_URL secret configured. Please set APP_URL in GitHub Repository Secrets."
+          TARGET_URL="${{ secrets.APP_URL }}"
+          if [ -z "$TARGET_URL" ]; then
+            TARGET_URL="https://ai-material-selector.streamlit.app"
           fi
+          
+          echo "Pinging primary target: $TARGET_URL"
+          curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) KeepAliveBot/1.0" -f -L "$TARGET_URL" > /dev/null && echo "✅ Primary ping successful!" || echo "⚠️ Primary ping returned error code (checking secondary)..."
+          
+          # Also ping secondary default URL pattern if set
+          ALT_URL="https://ai-material-selector-sanjaybp02.streamlit.app"
+          echo "Pinging secondary target: $ALT_URL"
+          curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) KeepAliveBot/1.0" -L "$ALT_URL" > /dev/null && echo "✅ Secondary ping sent!"

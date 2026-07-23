@@ -573,12 +573,17 @@ if st.button("Find materials", type="primary", disabled=not can_search, use_cont
                 status.write("Ranking top candidates...")
                 results_list = get_top3_recommendations(client, db_string, final_query, model_name, cost_instruction)
                 processed, rec_names, cost_values = [], [], []
+                seen_names = set()
 
                 for ai_data in results_list:
                     row = match_material(df_display, ai_data.get("MaterialName"))
                     if row is None:
                         continue
                     exact_name = row["Material Name"]
+                    if exact_name.lower() in seen_names:
+                        continue
+                    seen_names.add(exact_name.lower())
+
                     result = compute_part_cost(row, part_volume, cost_source, ai_data)
                     carbon_per_kg = float(row.get("Embodied Carbon (kg CO2/kg)", 0.0))
                     total_carbon_kg = result["mass_kg"] * carbon_per_kg

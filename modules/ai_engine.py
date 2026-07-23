@@ -91,55 +91,56 @@ def get_single_recommendation(client, db_string, query, model_name, cost_instruc
 
 def get_top3_recommendations(client, db_string, query, model_name, cost_instruction=""):
     """
-    Ask AI for top 3 material recommendations with pros/cons.
+    Ask AI for material recommendations (top 1 to 3 based on available candidates in db_string).
 
     Returns
     -------
     list of dicts, each with: MaterialName, Confidence, Reasoning, Pros, Cons,
     (optionally EstimatedCostINR)
     """
+    db_lines = [line.strip() for line in db_string.strip().split('\n') if line.strip()]
+    num_available = max(0, len(db_lines) - 1)  # subtract header row
+
+    if num_available <= 0:
+        return []
+
+    target_count = min(3, num_available)
+
     cost_json_example = ""
     if cost_instruction:
         cost_json_example = ',\n            "EstimatedCostINR": 250'
+
+    if target_count == 1:
+        task_str = "Recommend the ONLY BEST material from this specific database. Since only 1 material is available in the filtered database, your JSON array MUST contain EXACTLY 1 object. DO NOT repeat or duplicate the material under any circumstances."
+    elif target_count == 2:
+        task_str = "Recommend the TOP 2 BEST materials from this specific database, ranked from best to second best. Since only 2 materials are available in the filtered database, your JSON array MUST contain EXACTLY 2 objects. Every recommended material MUST be unique and distinct. DO NOT duplicate any material."
+    else:
+        task_str = "Recommend the TOP 3 BEST materials from this specific database, ranked from best to least suitable. Return up to 3 items in the JSON array. Every recommended material MUST be unique and distinct. DO NOT duplicate any material."
 
     prompt = f"""
     You are an expert Mechanical and Environmental Engineer.
     A user has given you the following requirement: "{query}"
 
-    Here is your trusted, filtered database of materials:
+    Here is your trusted, filtered database of materials ({num_available} total candidate(s)):
     {db_string}
 
     Your task:
-    Recommend the TOP 3 BEST materials from this specific database, ranked from best to least suitable.
+    {task_str}
     Consider not only standard properties, but also Fatigue Strength, Hardness, Corrosion/UV Resistance, Weldability, and compliance (Bio-compatible, Food Grade).
     Pay close attention to "Embodied Carbon" and favor low-carbon footprint solutions when sustainability is requested or relevant.
     For each material, provide the exact name from the database, a confidence score (0-100),
     detailed engineering reasoning (mentioning performance and sustainability tradeoffs), a list of pros, and a list of cons.
     {cost_instruction}
 
-    IMPORTANT: You MUST return ONLY a valid JSON array. Do not use Markdown code blocks. Do not add any extra text.
+    IMPORTANT: You MUST return ONLY a valid JSON array containing EXACTLY {target_count} unique material item(s). Do not use Markdown code blocks. Do not add any extra text.
     Format EXACTLY like this:
     [
         {{
             "MaterialName": "Exact Name from Database",
             "Confidence": 95,
             "Reasoning": "Detailed engineering and environmental explanation.",
-            "Pros": ["High strength-to-weight ratio", "Excellent machinability", "Low carbon footprint"],
+            "Pros": ["High strength-to-weight ratio", "Excellent machinability"],
             "Cons": ["Higher cost", "Limited high-temperature use"]{cost_json_example}
-        }},
-        {{
-            "MaterialName": "Second Best Material",
-            "Confidence": 82,
-            "Reasoning": "Detailed engineering and environmental explanation.",
-            "Pros": ["Good all-round properties", "Moderate carbon footprint"],
-            "Cons": ["Heavier than top pick"]{cost_json_example}
-        }},
-        {{
-            "MaterialName": "Third Best Material",
-            "Confidence": 70,
-            "Reasoning": "Detailed engineering and environmental explanation.",
-            "Pros": ["Very low cost", "Highly recyclable"],
-            "Cons": ["Lower performance", "Higher embodied carbon"]{cost_json_example}
         }}
     ]
     """
@@ -152,7 +153,16 @@ def get_top3_recommendations(client, db_string, query, model_name, cost_instruct
     if isinstance(results, dict):
         results = [results]
 
-    return results[:3]
+    # Deduplicate results strictly by normalized material name
+    seen_names = set()
+    unique_results = []
+    for item in results:
+        mname = item.get("MaterialName", "").strip().lower()
+        if mname and mname not in seen_names:
+            seen_names.add(mname)
+            unique_results.append(item)
+
+    return unique_results[:target_count]
 
 
 def chat_followup(client, conversation_history, question, model_name, context_data=""):

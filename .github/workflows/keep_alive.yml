@@ -12,15 +12,57 @@ jobs:
     steps:
       - name: Ping Streamlit Cloud Application
         run: |
+          ping_url() {
+            local url="$1"
+            local name="$2"
+            echo "Pinging $name: $url"
+            
+            local status_code="000"
+            local attempts=3
+            
+            for ((i=1; i<=attempts; i++)); do
+              echo "Attempt $i of $attempts..."
+              # Query HTTP status code directly without following endless auth redirect loops (-L)
+              status_code=$(curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) KeepAliveBot/1.0" --max-time 15 "$url" || echo "000")
+              
+              echo "Received HTTP status code: $status_code"
+              
+              if [[ "$status_code" =~ ^(200|301|302|303|307|308)$ ]]; then
+                echo "✅ $name ping successful! (Status: $status_code)"
+                return 0
+              fi
+              
+              if [ $i -lt $attempts ]; then
+                echo "Waiting 5 seconds before retrying..."
+                sleep 5
+              fi
+            done
+            
+            echo "⚠️ $name ping failed after $attempts attempts. Last status code: $status_code"
+            return 1
+          }
+
           TARGET_URL="${{ secrets.APP_URL }}"
           if [ -z "$TARGET_URL" ]; then
             TARGET_URL="https://ai-material-selector.streamlit.app"
           fi
           
-          echo "Pinging primary target: $TARGET_URL"
-          curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) KeepAliveBot/1.0" -f -L "$TARGET_URL" > /dev/null && echo "✅ Primary ping successful!" || echo "⚠️ Primary ping returned error code (checking secondary)..."
-          
-          # Also ping secondary default URL pattern if set
+          SUCCESS=0
+
+          if ping_url "$TARGET_URL" "Primary Target"; then
+            SUCCESS=1
+          fi
+
           ALT_URL="https://ai-material-selector-sanjaybp02.streamlit.app"
-          echo "Pinging secondary target: $ALT_URL"
-          curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) KeepAliveBot/1.0" -L "$ALT_URL" > /dev/null && echo "✅ Secondary ping sent!"
+          if ping_url "$ALT_URL" "Secondary Target"; then
+            SUCCESS=1
+          fi
+
+          if [ $SUCCESS -eq 1 ]; then
+            echo "🎉 At least one app target is alive!"
+            exit 0
+          else
+            echo "❌ All keep-alive targets failed to respond with a valid status code."
+            exit 1
+          fi
+

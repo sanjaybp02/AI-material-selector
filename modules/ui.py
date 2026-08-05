@@ -266,13 +266,20 @@ div[data-testid="stChatMessage"] {{
     position: fixed !important;
     bottom: 3.2rem !important;
     right: 1.5rem !important;
-    font-size: 0.75rem !important;
-    color: {TEXT_MUTED} !important;
-    background: transparent !important;
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+    color: #ffffff !important;
+    background: rgba(15, 23, 42, 0.9) !important;
+    padding: 6px 14px !important;
+    border-radius: 20px !important;
+    border: 1px solid rgba(88, 166, 255, 0.6) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), 0 0 12px rgba(88, 166, 255, 0.4) !important;
     z-index: 1000 !important;
     pointer-events: none !important;
     text-align: right !important;
+    text-shadow: 0 0 8px rgba(255, 255, 255, 0.8) !important;
 }}
+
 
 /* ── Tour highlights & spotlight ── */
 .tour-backdrop {{

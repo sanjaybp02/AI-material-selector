@@ -490,8 +490,11 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
         base_step
     )
 
-    # 1. Update Product Names in DATA section (Replace default Open CASCADE placeholder names)
+    # 1. Update Product & Material Names in DATA section (#4, #5, #6, #7, #10, #15)
     base_step = base_step.replace("Open CASCADE STEP translator 7.9 1", sanitized_name)
+    base_step = re.sub(r"PRODUCT_DEFINITION\('design','',#6,#9\);", f"PRODUCT_DEFINITION('design','{sanitized_name}',#6,#9);", base_step)
+    base_step = re.sub(r"PRODUCT_DEFINITION_SHAPE\('','',#5\);", f"PRODUCT_DEFINITION_SHAPE('{sanitized_name}','{sanitized_name}',#5);", base_step)
+    base_step = re.sub(r"PRODUCT_DEFINITION_FORMATION\('','',#7\);", f"PRODUCT_DEFINITION_FORMATION('{sanitized_name}','{sanitized_name}',#7);", base_step)
     base_step = re.sub(r"MANIFOLD_SOLID_BREP\('([^']*)',#16\);", f"MANIFOLD_SOLID_BREP('{sanitized_name}',#16);", base_step)
     base_step = re.sub(r"ADVANCED_BREP_SHAPE_REPRESENTATION\('([^']*)',\(#11,#15\),#345\);", f"ADVANCED_BREP_SHAPE_REPRESENTATION('{sanitized_name}_Shape',(#11,#15),#345);", base_step)
 
@@ -504,6 +507,7 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
     mat_entities.append(f"#{start_id+1}=MATERIAL_DESIGNATION('{sanitized_name}',#5);")
     mat_entities.append(f"#{start_id+2}=MATERIAL_DESIGNATION('{sanitized_name}',#7);")
     mat_entities.append(f"#{start_id+3}=MATERIAL_DESIGNATION('{sanitized_name}',#15);")
+    mat_entities.append(f"#{start_id+4}=MATERIAL_DESIGNATION_WITH_LOCATION('{sanitized_name}',#4,#5);")
 
     targets = [("#4", "pds"), ("#5", "pd"), ("#7", "prod"), ("#15", "solid")]
     cur_id = start_id + 10
@@ -554,6 +558,7 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
     if endsec_idx != -1:
         return base_step[:endsec_idx] + mat_str + "\nENDSEC;" + base_step[endsec_idx + len("ENDSEC;"):].lstrip()
     return base_step + "\n" + mat_str
+
 
 
 

@@ -262,23 +262,33 @@ div[data-testid="stChatMessage"] {{
     border: 1px solid var(--accent-border);
     color: #c9d1d9;
 }}
-.app-footer {{
+.app-footer, .app-footer * {{
     position: fixed !important;
     bottom: 3.2rem !important;
     right: 1.5rem !important;
-    font-size: 0.8rem !important;
-    font-weight: 600 !important;
+    font-size: 0.85rem !important;
+    font-weight: 700 !important;
     color: #ffffff !important;
-    background: rgba(15, 23, 42, 0.9) !important;
-    padding: 6px 14px !important;
+    background: #0f172a !important;
+    opacity: 1 !important;
+    filter: none !important;
+    padding: 6px 16px !important;
     border-radius: 20px !important;
-    border: 1px solid rgba(88, 166, 255, 0.6) !important;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), 0 0 12px rgba(88, 166, 255, 0.4) !important;
-    z-index: 1000 !important;
+    border: 1.5px solid #38bdf8 !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8), 0 0 15px rgba(56, 189, 248, 0.6) !important;
+    z-index: 999999 !important;
     pointer-events: none !important;
     text-align: right !important;
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.8) !important;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 0 20px rgba(56, 189, 248, 0.8) !important;
 }}
+
+
+def render_footer():
+    st.markdown(
+        '<div class="app-footer" style="opacity:1!important;color:#ffffff!important;background:#0f172a!important;border:1.5px solid #38bdf8!important;padding:6px 16px!important;border-radius:20px!important;font-weight:700!important;"><span style="opacity:1!important;color:#ffffff!important;font-weight:700!important;text-shadow:0 0 10px #ffffff, 0 0 20px #38bdf8!important;">made with ❤️ by sanjay_bp</span></div>',
+        unsafe_allow_html=True,
+    )
+
 
 
 /* ── Tour highlights & spotlight ── */
@@ -511,9 +521,10 @@ def render_sidebar_status(api_connected: bool, material_count: int):
 
 def render_footer():
     st.markdown(
-        '<div class="app-footer">made with ❤️ by sanjay_bp</div>',
+        '<div class="app-footer" style="opacity: 1 !important; color: #ffffff !important; background: #0f172a !important; border: 1.5px solid #38bdf8 !important; padding: 6px 16px !important; border-radius: 20px !important; font-weight: 700 !important; box-shadow: 0 0 15px rgba(56, 189, 248, 0.6) !important;"><span style="opacity: 1 !important; color: #ffffff !important; font-weight: 700 !important; text-shadow: 0 0 10px #ffffff, 0 0 20px #38bdf8 !important;">made with ❤️ by sanjay_bp</span></div>',
         unsafe_allow_html=True,
     )
+
 
 
 def render_tour_banner(step_num: int, total_steps: int, title: str, text: str, key_prefix: str):

@@ -6,3 +6,5 @@ requests
 plotly
 python-dotenv
 openpyxl
+cadquery
+

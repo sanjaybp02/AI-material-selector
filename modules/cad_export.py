@@ -1,4 +1,5 @@
 import datetime
+import os
 import re
 import pandas as pd
 from modules.data_loader import load_data
@@ -6,18 +7,15 @@ from modules.data_loader import load_data
 
 def generate_step_file(material_name, properties=None, extra_metadata=None):
     """
-    Generate a valid ISO 10303 STEP AP214 / AP242 file representing a standard
-    specimen block (10x10x100mm) with all material properties (density, yield strength,
-    tensile strength, elastic modulus, thermal conductivity, carbon footprint, cost, standards,
-    and any custom uploaded/user properties) embedded into the STEP header and ISO 10303
-    DATA section property definitions.
+    Generate a valid 3D CAD STEP file (AP214 / AP242) containing a 3D solid body
+    (using Open CASCADE / CadQuery) with embedded material properties
+    (density, yield strength, tensile strength, elastic modulus, thermal conductivity,
+    carbon footprint, cost, standards, and custom user properties).
     """
-    # Sanitize the name for STEP identifiers (alphanumeric and underscores)
     sanitized_id = re.sub(r'[^a-zA-Z0-9]', '_', str(material_name))
     sanitized_name = str(material_name).replace("'", "").replace('"', "")
     timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
-    # If properties dictionary is not provided, try to load from materials.csv
     if properties is None:
         try:
             df = load_data()
@@ -29,7 +27,6 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
         except Exception:
             properties = {}
 
-    # Clean properties dictionary
     clean_props = {}
     if isinstance(properties, dict):
         for k, v in properties.items():
@@ -40,22 +37,82 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
                     val_str = str(v)
                 clean_props[str(k).strip()] = val_str.replace("'", "''")
 
-    # Build header description summary
-    prop_summary_parts = []
-    for k, v in clean_props.items():
-        if k != "Material Name":
-            prop_summary_parts.append(f"{k}={v}")
-    
-    header_prop_str = "; ".join(prop_summary_parts) if prop_summary_parts else "Default mechanical & physical properties"
+    prop_summary_parts = [f"{k}={v}" for k, v in clean_props.items() if k != "Material Name"]
+    header_prop_str = "; ".join(prop_summary_parts) if prop_summary_parts else "Default properties"
     header_desc = f"Material Properties: {header_prop_str}"
 
-    # Build STEP DATA section property entities starting after #147
+    base_step = None
+    try:
+        import cadquery as cq
+        import tempfile
+        box = cq.Workplane("XY").box(10.0, 10.0, 100.0)
+        with tempfile.NamedTemporaryFile(suffix=".stp", delete=False) as tmp:
+            tmp_path = tmp.name
+        cq.exporters.export(box, tmp_path, exportType="STEP")
+        with open(tmp_path, "r", encoding="utf-8") as f:
+            base_step = f.read()
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+    except Exception:
+        base_step = None
+
+    if base_step:
+        base_step = re.sub(
+            r"FILE_DESCRIPTION\(\([^)]*\),'2;1'\);",
+            f"FILE_DESCRIPTION(('Material Specimen: {sanitized_name}','{header_desc}','ASTM Tensile Specimen Block (10x10x100mm)'),'2;1');",
+            base_step
+        )
+        base_step = re.sub(
+            r"FILE_NAME\([^;]*\);",
+            f"FILE_NAME('{sanitized_id}_specimen.stp','{timestamp}',('AI Material Selector'),('AI Material Selector'),'2.0','AI Material Selector','{sanitized_name} - {header_desc}');",
+            base_step
+        )
+        
+        entity_matches = re.findall(r"#(\d+)\s*=", base_step)
+        max_id = max([int(m) for m in entity_matches]) if entity_matches else 500
+        start_id = max_id + 10
+        
+        pd_shape_match = re.search(r"#(\d+)\s*=\s*PRODUCT_DEFINITION_SHAPE", base_step)
+        pd_shape_id = f"#{pd_shape_match.group(1)}" if pd_shape_match else "#4"
+
+        solid_match = re.search(r"#(\d+)\s*=\s*MANIFOLD_SOLID_BREP", base_step)
+        solid_id = f"#{solid_match.group(1)}" if solid_match else pd_shape_id
+
+        mat_entities = []
+        mat_entities.append(f"#{start_id}=MATERIAL_DESIGNATION('{sanitized_name}',({solid_id},{pd_shape_id}));")
+        mat_entities.append(f"#{start_id+1}=MATERIAL_PROPERTY('','material designation',{solid_id});")
+        mat_entities.append(f"#{start_id+2}=DESCRIPTIVE_REPRESENTATION_ITEM('material_name','{sanitized_name}');")
+        mat_entities.append(f"#{start_id+3}=REPRESENTATION('material designation representation',(#{start_id+2}),#10);")
+        mat_entities.append(f"#{start_id+4}=PROPERTY_DEFINITION_REPRESENTATION(#{start_id+1},#{start_id+3});")
+        
+        density_val = clean_props.get("Density (g/cm³)", clean_props.get("Density", ""))
+        cur_id = start_id + 10
+        if density_val:
+            mat_entities.append(f"#{cur_id}=MATERIAL_PROPERTY('density','density',{solid_id});")
+            mat_entities.append(f"#{cur_id+1}=DESCRIPTIVE_REPRESENTATION_ITEM('density','{density_val} g/cm3');")
+            mat_entities.append(f"#{cur_id+2}=REPRESENTATION('density representation',(#{cur_id+1}),#10);")
+            mat_entities.append(f"#{cur_id+3}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id},#{cur_id+2});")
+            cur_id += 10
+
+        for prop_key, prop_val in clean_props.items():
+            if prop_key in ["Material Name", "Density (g/cm³)", "Density"]:
+                continue
+            safe_key = re.sub(r'[^a-zA-Z0-9_]', '_', prop_key).lower()
+            safe_val = str(prop_val).replace("'", "''")
+            mat_entities.append(f"#{cur_id}=MATERIAL_PROPERTY('{safe_key}','{prop_key}',{solid_id});")
+            mat_entities.append(f"#{cur_id+1}=DESCRIPTIVE_REPRESENTATION_ITEM('{safe_key}','{safe_val}');")
+            mat_entities.append(f"#{cur_id+2}=REPRESENTATION('{safe_key} representation',(#{cur_id+1}),#10);")
+            mat_entities.append(f"#{cur_id+3}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id},#{cur_id+2});")
+            cur_id += 10
+
+        mat_str = "\n".join(mat_entities)
+        parts = base_step.split("ENDSEC;", 1)
+        return parts[0] + mat_str + "\nENDSEC;" + parts[1]
+
+    # Fallback to pure B-Rep STEP generator
     data_property_entities = []
-    
-    # Extract density if available for explicit CAD density binding
     density_val = clean_props.get("Density (g/cm³)", clean_props.get("Density", ""))
 
-    # #160+: Material designation & property definitions linked directly to SOLID BODY (#141), SHAPE (#142/#150), PRODUCT (#146), and PRODUCT_DEFINITION (#149) for SpaceClaim / SolidWorks / ANSYS
     data_property_entities.append(f"#160=MATERIAL_DESIGNATION('{sanitized_name}',(#141,#142,#146,#149,#150));")
     data_property_entities.append(f"#161=MATERIAL_PROPERTY('','material designation',#141);")
     data_property_entities.append(f"#162=DESCRIPTIVE_REPRESENTATION_ITEM('material_name','{sanitized_name}');")

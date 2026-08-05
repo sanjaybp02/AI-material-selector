@@ -403,8 +403,10 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
         cur_id += 10
 
     mat_str = "\n".join(mat_entities)
-    parts = base_step.split("ENDSEC;", 1)
-    return parts[0] + mat_str + "\nENDSEC;" + parts[1]
+    endsec_idx = base_step.rfind("ENDSEC;")
+    if endsec_idx != -1:
+        return base_step[:endsec_idx] + mat_str + "\nENDSEC;" + base_step[endsec_idx + len("ENDSEC;"):].lstrip()
+    return base_step + "\n" + mat_str
 
 
 

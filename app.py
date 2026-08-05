@@ -18,6 +18,7 @@ from modules.cost_engine import fetch_live_metal_price, calculate_part_cost
 from modules.ai_engine import get_single_recommendation, get_top3_recommendations, chat_followup, explain_filter_failure
 from modules.charts import radar_chart, scatter_plot, property_heatmap
 from modules.pdf_report import create_pdf
+from modules.cad_export import generate_step_file
 from modules.history import init_history, log_search, render_history_table
 from modules.templates import load_templates, save_custom_template, delete_custom_template
 from modules.ui import (
@@ -185,7 +186,7 @@ def render_lite_results(r, currency, unit_system):
         r.get("properties"), carbon_val, carbon_unit
     )
 
-    c_btn1, c_btn2 = st.columns(2)
+    c_btn1, c_btn2, c_btn3 = st.columns(3)
     with c_btn1:
         st.download_button(
             "Download PDF report", data=pdf_bytes,
@@ -193,6 +194,16 @@ def render_lite_results(r, currency, unit_system):
             use_container_width=True,
         )
     with c_btn2:
+        step_str = generate_step_file(r["exact_name"], r.get("properties"))
+        st.download_button(
+            "Export CAD (STEP)",
+            data=step_str.encode("utf-8"),
+            file_name=f"{r['exact_name'].replace(' ', '_')}_specimen.stp",
+            mime="application/step",
+            key="step_single",
+            use_container_width=True,
+        )
+    with c_btn3:
         if st.button("View Datasheet", use_container_width=True):
             render_datasheet(r.get("properties", {}))
 
@@ -258,7 +269,7 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
                     item.get("properties"), carbon_val, carbon_unit
                 )
                 
-                c_btn1, c_btn2 = st.columns(2)
+                c_btn1, c_btn2, c_btn3 = st.columns(3)
                 with c_btn1:
                     st.download_button(
                         f"PDF — {item['exact_name']}", data=pdf_bytes,
@@ -267,6 +278,14 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
                         use_container_width=True,
                     )
                 with c_btn2:
+                    step_str = generate_step_file(item["exact_name"], item.get("properties"))
+                    st.download_button(
+                        f"CAD (STEP)", data=step_str.encode("utf-8"),
+                        file_name=f"{item['exact_name'].replace(' ', '_')}_specimen.stp",
+                        mime="application/step", key=f"step_{rank}",
+                        use_container_width=True,
+                    )
+                with c_btn3:
                     if st.button(f"Datasheet", key=f"ds_{rank}", use_container_width=True):
                         render_datasheet(item.get("properties", {}))
 

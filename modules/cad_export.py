@@ -1,22 +1,89 @@
 import datetime
 import re
+import pandas as pd
+from modules.data_loader import load_data
 
 
-def generate_step_file(material_name):
+def generate_step_file(material_name, properties=None, extra_metadata=None):
     """
-    Generate a valid STEP AP214 file representing a standard 10x10x100mm block
-    with the recommended material name embedded in the CAD product metadata.
+    Generate a valid ISO 10303 STEP AP214 / AP242 file representing a standard
+    specimen block (10x10x100mm) with all material properties (density, yield strength,
+    tensile strength, elastic modulus, thermal conductivity, carbon footprint, cost, standards,
+    and any custom uploaded/user properties) embedded into the STEP header and ISO 10303
+    DATA section property definitions.
     """
     # Sanitize the name for STEP identifiers (alphanumeric and underscores)
-    sanitized_id = re.sub(r'[^a-zA-Z0-9]', '_', material_name)
-    # Sanitize name for string values
-    sanitized_name = material_name.replace("'", "").replace('"', "")
+    sanitized_id = re.sub(r'[^a-zA-Z0-9]', '_', str(material_name))
+    sanitized_name = str(material_name).replace("'", "").replace('"', "")
     timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+    # If properties dictionary is not provided, try to load from materials.csv
+    if properties is None:
+        try:
+            df = load_data()
+            match = df[df["Material Name"].astype(str).str.lower() == str(material_name).lower()]
+            if not match.empty:
+                properties = match.iloc[0].to_dict()
+            else:
+                properties = {}
+        except Exception:
+            properties = {}
+
+    # Clean properties dictionary
+    clean_props = {}
+    if isinstance(properties, dict):
+        for k, v in properties.items():
+            if pd.notna(v) and v is not None and v != "":
+                if isinstance(v, float):
+                    val_str = f"{v:.4g}" if abs(v) < 10000 else f"{v:.2f}"
+                else:
+                    val_str = str(v)
+                clean_props[str(k).strip()] = val_str.replace("'", "''")
+
+    # Build header description summary
+    prop_summary_parts = []
+    for k, v in clean_props.items():
+        if k != "Material Name":
+            prop_summary_parts.append(f"{k}={v}")
+    
+    header_prop_str = "; ".join(prop_summary_parts) if prop_summary_parts else "Default mechanical & physical properties"
+    header_desc = f"Material Properties: {header_prop_str}"
+
+    # Build STEP DATA section property entities starting after #147
+    data_property_entities = []
+    
+    # #150: Material designation
+    data_property_entities.append(f"#150=MATERIAL_DESIGNATION('{sanitized_name}',(#145));")
+    data_property_entities.append(f"#151=PROPERTY_DEFINITION('material property','material designation',#145);")
+    data_property_entities.append(f"#152=DESCRIPTIVE_REPRESENTATION_ITEM('material_name','{sanitized_name}');")
+    data_property_entities.append(f"#153=REPRESENTATION('material designation representation',(#152),#6);")
+    data_property_entities.append(f"#154=PROPERTY_DEFINITION_REPRESENTATION(#151,#153);")
+
+    entity_id = 160
+    for prop_key, prop_val in clean_props.items():
+        if prop_key == "Material Name":
+            continue
+        safe_key = re.sub(r'[^a-zA-Z0-9_]', '_', prop_key).lower()
+        safe_val = str(prop_val).replace("'", "''")
+        
+        p_def = entity_id
+        d_item = entity_id + 1
+        rep = entity_id + 2
+        p_rep = entity_id + 3
+        
+        data_property_entities.append(f"#{p_def}=PROPERTY_DEFINITION('material property','{prop_key}',#145);")
+        data_property_entities.append(f"#{d_item}=DESCRIPTIVE_REPRESENTATION_ITEM('{safe_key}','{safe_val}');")
+        data_property_entities.append(f"#{rep}=REPRESENTATION('{safe_key} representation',(#{d_item}),#6);")
+        data_property_entities.append(f"#{p_rep}=PROPERTY_DEFINITION_REPRESENTATION(#{p_def},#{rep});")
+        
+        entity_id += 10
+
+    properties_entities_str = "\n".join(data_property_entities)
 
     step_content = f"""ISO-10303-21;
 HEADER;
-FILE_DESCRIPTION(('Material Specimen: {sanitized_name}','ASTM Tensile Specimen block'),'2;1');
-FILE_NAME('{sanitized_id}_specimen.stp','{timestamp}',('AI Material Selector'),('AI Material Selector'),'1.0','AI Material Selector','');
+FILE_DESCRIPTION(('Material Specimen: {sanitized_name}','{header_desc}','ASTM Tensile Specimen block (10x10x100mm)'),'2;1');
+FILE_NAME('{sanitized_id}_specimen.stp','{timestamp}',('AI Material Selector'),('AI Material Selector'),'2.0','AI Material Selector','');
 FILE_SCHEMA(('AUTOMOTIVE_DESIGN {{1 0 10303 214 1 1 1 1}}'));
 ENDSEC;
 DATA;
@@ -161,13 +228,15 @@ DATA;
 #139=SHAPE_REPRESENTATION('',(#138),#6);
 #140=PRODUCT_DEFINITION_CONTEXT('',#141,'design');
 #141=APPLICATION_CONTEXT('automotive design');
-#142=PRODUCT_CONTEXT('',#141,'');
-#143=PRODUCT('{sanitized_id}_Part','{sanitized_name}_Part','',(#142));
+#142=PRODUCT_CONTEXT('',#141,'mechanical');
+#143=PRODUCT('{sanitized_id}_Part','{sanitized_name}_Part','{sanitized_name} ASTM Specimen with Material Properties',(#142));
 #144=PRODUCT_DEFINITION_FORMATION('','',#143);
-#145=PRODUCT_DEFINITION('design','',#144,#140);
+#145=PRODUCT_DEFINITION('design','Material Specimen for {sanitized_name}',#144,#140);
 #146=PRODUCT_DEFINITION_SHAPE('',$,#145);
 #147=SHAPE_DEFINITION_REPRESENTATION(#146,#139);
+{properties_entities_str}
 ENDSEC;
 END-ISO-10303-21;
 """
     return step_content
+

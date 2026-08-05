@@ -55,15 +55,15 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
     # Extract density if available for explicit CAD density binding
     density_val = clean_props.get("Density (g/cm³)", clean_props.get("Density", ""))
 
-    # #150: Material designation & property definitions linked to PRODUCT (#143), PRODUCT_DEFINITION (#145), and SHAPE (#146) for SpaceClaim / SolidWorks / ANSYS
-    data_property_entities.append(f"#150=MATERIAL_DESIGNATION('{sanitized_name}',(#143,#145,#146));")
-    data_property_entities.append(f"#151=MATERIAL_PROPERTY('','material designation',#146);")
+    # #150: Material designation & property definitions linked directly to SOLID BODY (#138), SHAPE (#139/#146), PRODUCT (#143), and PRODUCT_DEFINITION (#145) for SpaceClaim / SolidWorks / ANSYS
+    data_property_entities.append(f"#150=MATERIAL_DESIGNATION('{sanitized_name}',(#138,#139,#143,#145,#146));")
+    data_property_entities.append(f"#151=MATERIAL_PROPERTY('','material designation',#138);")
     data_property_entities.append(f"#152=DESCRIPTIVE_REPRESENTATION_ITEM('material_name','{sanitized_name}');")
     data_property_entities.append(f"#153=REPRESENTATION('material designation representation',(#152),#6);")
     data_property_entities.append(f"#154=PROPERTY_DEFINITION_REPRESENTATION(#151,#153);")
 
     if density_val:
-        data_property_entities.append(f"#155=MATERIAL_PROPERTY('density','density',#146);")
+        data_property_entities.append(f"#155=MATERIAL_PROPERTY('density','density',#138);")
         data_property_entities.append(f"#156=DESCRIPTIVE_REPRESENTATION_ITEM('density','{density_val} g/cm3');")
         data_property_entities.append(f"#157=REPRESENTATION('density representation',(#156),#6);")
         data_property_entities.append(f"#158=PROPERTY_DEFINITION_REPRESENTATION(#155,#157);")
@@ -80,7 +80,7 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
         rep = entity_id + 2
         p_rep = entity_id + 3
         
-        data_property_entities.append(f"#{p_def}=MATERIAL_PROPERTY('{safe_key}','{prop_key}',#146);")
+        data_property_entities.append(f"#{p_def}=MATERIAL_PROPERTY('{safe_key}','{prop_key}',#138);")
         data_property_entities.append(f"#{d_item}=DESCRIPTIVE_REPRESENTATION_ITEM('{safe_key}','{safe_val}');")
         data_property_entities.append(f"#{rep}=REPRESENTATION('{safe_key} representation',(#{d_item}),#6);")
         data_property_entities.append(f"#{p_rep}=PROPERTY_DEFINITION_REPRESENTATION(#{p_def},#{rep});")

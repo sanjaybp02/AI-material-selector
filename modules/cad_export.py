@@ -489,25 +489,42 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
         f"FILE_NAME('{sanitized_id}_specimen.stp','{timestamp}',('AI Material Selector'),('AI Material Selector'),'2.0','AI Material Selector','{sanitized_name} - {header_desc}');",
         base_step
     )
-    
-    # Inject ISO 10303 AP214 PROPERTY_DEFINITION and MATERIAL_DESIGNATION entities
+
+    # 1. Update Product Names in DATA section (Replace default Open CASCADE placeholder names)
+    base_step = base_step.replace("Open CASCADE STEP translator 7.9 1", sanitized_name)
+    base_step = re.sub(r"MANIFOLD_SOLID_BREP\('([^']*)',#16\);", f"MANIFOLD_SOLID_BREP('{sanitized_name}',#16);", base_step)
+    base_step = re.sub(r"ADVANCED_BREP_SHAPE_REPRESENTATION\('([^']*)',\(#11,#15\),#345\);", f"ADVANCED_BREP_SHAPE_REPRESENTATION('{sanitized_name}_Shape',(#11,#15),#345);", base_step)
+
+    # 2. Comprehensive Material Entities for SpaceClaim, ANSYS, SolidWorks, FreeCAD
     mat_entities = []
     start_id = 500
 
+    # Bind MATERIAL_DESIGNATION to PRODUCT_DEFINITION_SHAPE (#4), PRODUCT_DEFINITION (#5), PRODUCT (#7), and MANIFOLD_SOLID_BREP (#15)
     mat_entities.append(f"#{start_id}=MATERIAL_DESIGNATION('{sanitized_name}',#4);")
-    mat_entities.append(f"#{start_id+1}=MATERIAL_DESIGNATION('{sanitized_name}',#15);")
-    mat_entities.append(f"#{start_id+2}=PROPERTY_DEFINITION('material property','material designation',#4);")
-    mat_entities.append(f"#{start_id+3}=DESCRIPTIVE_REPRESENTATION_ITEM('material_name','{sanitized_name}');")
-    mat_entities.append(f"#{start_id+4}=REPRESENTATION('material designation representation',(#{start_id+3}),#345);")
-    mat_entities.append(f"#{start_id+5}=PROPERTY_DEFINITION_REPRESENTATION(#{start_id+2},#{start_id+4});")
-    
-    density_val = clean_props.get("Density (g/cm³)", clean_props.get("Density", ""))
+    mat_entities.append(f"#{start_id+1}=MATERIAL_DESIGNATION('{sanitized_name}',#5);")
+    mat_entities.append(f"#{start_id+2}=MATERIAL_DESIGNATION('{sanitized_name}',#7);")
+    mat_entities.append(f"#{start_id+3}=MATERIAL_DESIGNATION('{sanitized_name}',#15);")
+
+    # Material Name Property Definitions
+    mat_entities.append(f"#{start_id+4}=PROPERTY_DEFINITION('material property','material designation',#4);")
+    mat_entities.append(f"#{start_id+5}=DESCRIPTIVE_REPRESENTATION_ITEM('material_name','{sanitized_name}');")
+    mat_entities.append(f"#{start_id+6}=REPRESENTATION('material designation representation',(#{start_id+5}),#345);")
+    mat_entities.append(f"#{start_id+7}=PROPERTY_DEFINITION_REPRESENTATION(#{start_id+4},#{start_id+6});")
+
+    mat_entities.append(f"#{start_id+8}=PROPERTY_DEFINITION('material property','material designation',#15);")
+    mat_entities.append(f"#{start_id+9}=PROPERTY_DEFINITION_REPRESENTATION(#{start_id+8},#{start_id+6});")
+
+    density_val_str = clean_props.get("Density (g/cm³)", clean_props.get("Density", ""))
     cur_id = start_id + 10
-    if density_val:
+    if density_val_str:
+        # Density for SpaceClaim / ANSYS / SolidWorks
         mat_entities.append(f"#{cur_id}=PROPERTY_DEFINITION('density','density',#4);")
-        mat_entities.append(f"#{cur_id+1}=DESCRIPTIVE_REPRESENTATION_ITEM('density','{density_val} g/cm3');")
+        mat_entities.append(f"#{cur_id+1}=DESCRIPTIVE_REPRESENTATION_ITEM('density','{density_val_str} g/cm3');")
         mat_entities.append(f"#{cur_id+2}=REPRESENTATION('density representation',(#{cur_id+1}),#345);")
         mat_entities.append(f"#{cur_id+3}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id},#{cur_id+2});")
+
+        mat_entities.append(f"#{cur_id+4}=PROPERTY_DEFINITION('density','density',#15);")
+        mat_entities.append(f"#{cur_id+5}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id+4},#{cur_id+2});")
         cur_id += 10
 
     for prop_key, prop_val in clean_props.items():
@@ -519,6 +536,9 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
         mat_entities.append(f"#{cur_id+1}=DESCRIPTIVE_REPRESENTATION_ITEM('{safe_key}','{safe_val}');")
         mat_entities.append(f"#{cur_id+2}=REPRESENTATION('{safe_key} representation',(#{cur_id+1}),#345);")
         mat_entities.append(f"#{cur_id+3}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id},#{cur_id+2});")
+
+        mat_entities.append(f"#{cur_id+4}=PROPERTY_DEFINITION('{safe_key}','{prop_key}',#15);")
+        mat_entities.append(f"#{cur_id+5}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id+4},#{cur_id+2});")
         cur_id += 10
 
     mat_str = "\n".join(mat_entities)
@@ -526,6 +546,7 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
     if endsec_idx != -1:
         return base_step[:endsec_idx] + mat_str + "\nENDSEC;" + base_step[endsec_idx + len("ENDSEC;"):].lstrip()
     return base_step + "\n" + mat_str
+
 
 
 

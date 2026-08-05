@@ -7,4 +7,6 @@ plotly
 python-dotenv
 openpyxl
 cadquery
+starlette<0.45.0
+
 

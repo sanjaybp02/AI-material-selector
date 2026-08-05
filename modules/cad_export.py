@@ -4,13 +4,309 @@ import re
 import pandas as pd
 from modules.data_loader import load_data
 
+# 100% Validated Open CASCADE 3D B-Rep Solid Specimen Template (10mm x 10mm x 100mm)
+OCCT_SOLID_TEMPLATE = """ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('Material Specimen: {sanitized_name}','{header_desc}','ASTM Tensile Specimen Block (10x10x100mm)'),'2;1');
+FILE_NAME('{sanitized_id}_specimen.stp','{timestamp}',('AI Material Selector'),('AI Material Selector'),'2.0','AI Material Selector','{sanitized_name} - {header_desc}');
+FILE_SCHEMA(('AUTOMOTIVE_DESIGN {{ 1 0 10303 214 1 1 1 1 }}'));
+ENDSEC;
+DATA;
+#1 = APPLICATION_PROTOCOL_DEFINITION('international standard','automotive_design',2000,#2);
+#2 = APPLICATION_CONTEXT('core data for automotive mechanical design processes');
+#3 = SHAPE_DEFINITION_REPRESENTATION(#4,#10);
+#4 = PRODUCT_DEFINITION_SHAPE('','',#5);
+#5 = PRODUCT_DEFINITION('design','',#6,#9);
+#6 = PRODUCT_DEFINITION_FORMATION('','',#7);
+#7 = PRODUCT('{sanitized_id}_Part','{sanitized_name}_Part','{sanitized_name} Solid Specimen Block',(#8));
+#8 = PRODUCT_CONTEXT('',#2,'mechanical');
+#9 = PRODUCT_DEFINITION_CONTEXT('part definition',#2,'design');
+#10 = ADVANCED_BREP_SHAPE_REPRESENTATION('{sanitized_id}_Specimen_Shape',(#11,#15),#345);
+#11 = AXIS2_PLACEMENT_3D('',#12,#13,#14);
+#12 = CARTESIAN_POINT('',(0.,0.,0.));
+#13 = DIRECTION('',(0.,0.,1.));
+#14 = DIRECTION('',(1.,0.,-0.));
+#15 = MANIFOLD_SOLID_BREP('{sanitized_id}_Specimen_Solid',#16);
+#16 = CLOSED_SHELL('Solid Shell',(#17,#137,#237,#284,#331,#338));
+#17 = ADVANCED_FACE('',(#18),#32,.F.);
+#18 = FACE_BOUND('',#19,.F.);
+#19 = EDGE_LOOP('',(#20,#55,#83,#111));
+#20 = ORIENTED_EDGE('',*,*,#21,.F.);
+#21 = EDGE_CURVE('',#22,#24,#26,.T.);
+#22 = VERTEX_POINT('',#23);
+#23 = CARTESIAN_POINT('',(-5.,-5.,-50.));
+#24 = VERTEX_POINT('',#25);
+#25 = CARTESIAN_POINT('',(-5.,-5.,50.));
+#26 = SURFACE_CURVE('',#27,(#31,#43),.PCURVE_S1.);
+#27 = LINE('',#28,#29);
+#28 = CARTESIAN_POINT('',(-5.,-5.,-50.));
+#29 = VECTOR('',#30,1.);
+#30 = DIRECTION('',(0.,0.,1.));
+#31 = PCURVE('',#32,#37);
+#32 = PLANE('',#33);
+#33 = AXIS2_PLACEMENT_3D('',#34,#35,#36);
+#34 = CARTESIAN_POINT('',(-5.,-5.,-50.));
+#35 = DIRECTION('',(1.,0.,0.));
+#36 = DIRECTION('',(0.,0.,1.));
+#37 = DEFINITIONAL_REPRESENTATION('',(#38),#42);
+#38 = LINE('',#39,#40);
+#39 = CARTESIAN_POINT('',(0.,0.));
+#40 = VECTOR('',#41,1.);
+#41 = DIRECTION('',(1.,0.));
+#42 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#43 = PCURVE('',#44,#49);
+#44 = PLANE('',#45);
+#45 = AXIS2_PLACEMENT_3D('',#46,#47,#48);
+#46 = CARTESIAN_POINT('',(-5.,-5.,-50.));
+#47 = DIRECTION('',(0.,1.,0.));
+#48 = DIRECTION('',(0.,0.,1.));
+#49 = DEFINITIONAL_REPRESENTATION('',(#50),#54);
+#50 = LINE('',#51,#52);
+#51 = CARTESIAN_POINT('',(0.,0.));
+#52 = VECTOR('',#53,1.);
+#53 = DIRECTION('',(1.,0.));
+#54 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#55 = ORIENTED_EDGE('',*,*,#56,.T.);
+#56 = EDGE_CURVE('',#22,#57,#59,.T.);
+#57 = VERTEX_POINT('',#58);
+#58 = CARTESIAN_POINT('',(-5.,5.,-50.));
+#59 = SURFACE_CURVE('',#60,(#64,#71),.PCURVE_S1.);
+#60 = LINE('',#61,#62);
+#61 = CARTESIAN_POINT('',(-5.,-5.,-50.));
+#62 = VECTOR('',#63,1.);
+#63 = DIRECTION('',(0.,1.,0.));
+#64 = PCURVE('',#32,#65);
+#65 = DEFINITIONAL_REPRESENTATION('',(#66),#70);
+#66 = LINE('',#67,#68);
+#67 = CARTESIAN_POINT('',(0.,0.));
+#68 = VECTOR('',#69,1.);
+#69 = DIRECTION('',(0.,-1.));
+#70 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#71 = PCURVE('',#72,#77);
+#72 = PLANE('',#73);
+#73 = AXIS2_PLACEMENT_3D('',#74,#75,#76);
+#74 = CARTESIAN_POINT('',(-5.,-5.,-50.));
+#75 = DIRECTION('',(0.,0.,1.));
+#76 = DIRECTION('',(1.,0.,0.));
+#77 = DEFINITIONAL_REPRESENTATION('',(#78),#82);
+#78 = LINE('',#79,#80);
+#79 = CARTESIAN_POINT('',(0.,0.));
+#80 = VECTOR('',#81,1.);
+#81 = DIRECTION('',(0.,1.));
+#82 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#83 = ORIENTED_EDGE('',*,*,#84,.F.);
+#84 = EDGE_CURVE('',#85,#57,#87,.T.);
+#85 = VERTEX_POINT('',#86);
+#86 = CARTESIAN_POINT('',(-5.,5.,50.));
+#87 = SURFACE_CURVE('',#88,(#92,#99),.PCURVE_S1.);
+#88 = LINE('',#89,#90);
+#89 = CARTESIAN_POINT('',(-5.,5.,-50.));
+#90 = VECTOR('',#91,1.);
+#91 = DIRECTION('',(0.,0.,1.));
+#92 = PCURVE('',#32,#93);
+#93 = DEFINITIONAL_REPRESENTATION('',(#94),#98);
+#94 = LINE('',#95,#96);
+#95 = CARTESIAN_POINT('',(0.,10.));
+#96 = VECTOR('',#97,1.);
+#97 = DIRECTION('',(1.,0.));
+#98 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#99 = PCURVE('',#100,#105);
+#100 = PLANE('',#101);
+#101 = AXIS2_PLACEMENT_3D('',#102,#103,#104);
+#102 = CARTESIAN_POINT('',(-5.,5.,-50.));
+#103 = DIRECTION('',(0.,1.,0.));
+#104 = DIRECTION('',(0.,0.,1.));
+#105 = DEFINITIONAL_REPRESENTATION('',(#106),#110);
+#106 = LINE('',#107,#108);
+#107 = CARTESIAN_POINT('',(0.,0.));
+#108 = VECTOR('',#109,1.);
+#109 = DIRECTION('',(1.,0.));
+#110 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#111 = ORIENTED_EDGE('',*,*,#112,.F.);
+#112 = EDGE_CURVE('',#24,#85,#114,.T.);
+#113 = SURFACE_CURVE('',#114,(#118,#125),.PCURVE_S1.);
+#114 = LINE('',#115,#116);
+#115 = CARTESIAN_POINT('',(-5.,-5.,50.));
+#116 = VECTOR('',#117,1.);
+#117 = DIRECTION('',(0.,1.,0.));
+#118 = PCURVE('',#32,#119);
+#119 = DEFINITIONAL_REPRESENTATION('',(#120),#124);
+#120 = LINE('',#121,#122);
+#121 = CARTESIAN_POINT('',(100.,0.));
+#122 = VECTOR('',#123,1.);
+#123 = DIRECTION('',(0.,-1.));
+#124 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#125 = PCURVE('',#126,#131);
+#126 = PLANE('',#127);
+#127 = AXIS2_PLACEMENT_3D('',#128,#129,#130);
+#128 = CARTESIAN_POINT('',(-5.,-5.,50.));
+#129 = DIRECTION('',(0.,0.,1.));
+#130 = DIRECTION('',(1.,0.,0.));
+#131 = DEFINITIONAL_REPRESENTATION('',(#132),#136);
+#132 = LINE('',#133,#134);
+#133 = CARTESIAN_POINT('',(0.,0.));
+#134 = VECTOR('',#135,1.);
+#135 = DIRECTION('',(0.,1.));
+#136 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#137 = ADVANCED_FACE('',(#138),#44,.F.);
+#138 = FACE_BOUND('',#139,.F.);
+#139 = EDGE_LOOP('',(#140,#171,#199,#208));
+#140 = ORIENTED_EDGE('',*,*,#141,.F.);
+#141 = EDGE_CURVE('',#142,#144,#146,.T.);
+#142 = VERTEX_POINT('',#143);
+#143 = CARTESIAN_POINT('',(5.,-5.,-50.));
+#144 = VERTEX_POINT('',#145);
+#145 = CARTESIAN_POINT('',(5.,-5.,50.));
+#146 = SURFACE_CURVE('',#147,(#151,#163),.PCURVE_S1.);
+#147 = LINE('',#148,#149);
+#148 = CARTESIAN_POINT('',(5.,-5.,-50.));
+#149 = VECTOR('',#150,1.);
+#150 = DIRECTION('',(0.,0.,1.));
+#151 = PCURVE('',#44,#152);
+#152 = DEFINITIONAL_REPRESENTATION('',(#153),#157);
+#153 = LINE('',#154,#155);
+#154 = CARTESIAN_POINT('',(10.,0.));
+#155 = VECTOR('',#156,1.);
+#156 = DIRECTION('',(0.,1.));
+#157 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#158 = PCURVE('',#159,#164);
+#159 = PLANE('',#160);
+#160 = AXIS2_PLACEMENT_3D('',#161,#162,#163);
+#161 = CARTESIAN_POINT('',(5.,-5.,-50.));
+#162 = DIRECTION('',(1.,0.,0.));
+#163 = DIRECTION('',(0.,0.,1.));
+#164 = DEFINITIONAL_REPRESENTATION('',(#165),#169);
+#165 = LINE('',#166,#167);
+#166 = CARTESIAN_POINT('',(0.,0.));
+#167 = VECTOR('',#168,1.);
+#168 = DIRECTION('',(1.,0.));
+#169 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#171 = ORIENTED_EDGE('',*,*,#172,.T.);
+#172 = EDGE_CURVE('',#142,#22,#174,.T.);
+#173 = SURFACE_CURVE('',#174,(#178,#185),.PCURVE_S1.);
+#174 = LINE('',#175,#176);
+#175 = CARTESIAN_POINT('',(-5.,-5.,-50.));
+#176 = VECTOR('',#177,1.);
+#177 = DIRECTION('',(1.,0.,0.));
+#178 = PCURVE('',#44,#179);
+#179 = DEFINITIONAL_REPRESENTATION('',(#180),#184);
+#180 = LINE('',#181,#182);
+#181 = CARTESIAN_POINT('',(0.,0.));
+#182 = VECTOR('',#183,1.);
+#183 = DIRECTION('',(-1.,0.));
+#184 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#185 = PCURVE('',#72,#186);
+#186 = DEFINITIONAL_REPRESENTATION('',(#187),#191);
+#187 = LINE('',#188,#189);
+#188 = CARTESIAN_POINT('',(0.,0.));
+#189 = VECTOR('',#190,1.);
+#190 = DIRECTION('',(1.,0.));
+#191 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#199 = ORIENTED_EDGE('',*,*,#21,.T.);
+#208 = ORIENTED_EDGE('',*,*,#209,.F.);
+#209 = EDGE_CURVE('',#144,#24,#211,.T.);
+#210 = SURFACE_CURVE('',#211,(#215,#222),.PCURVE_S1.);
+#211 = LINE('',#212,#213);
+#212 = CARTESIAN_POINT('',(-5.,-5.,50.));
+#213 = VECTOR('',#214,1.);
+#214 = DIRECTION('',(1.,0.,0.));
+#215 = PCURVE('',#44,#216);
+#216 = DEFINITIONAL_REPRESENTATION('',(#217),#221);
+#217 = LINE('',#218,#219);
+#218 = CARTESIAN_POINT('',(0.,100.));
+#219 = VECTOR('',#220,1.);
+#220 = DIRECTION('',(1.,0.));
+#221 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#222 = PCURVE('',#126,#223);
+#223 = DEFINITIONAL_REPRESENTATION('',(#224),#228);
+#224 = LINE('',#225,#226);
+#225 = CARTESIAN_POINT('',(0.,0.));
+#226 = VECTOR('',#227,1.);
+#227 = DIRECTION('',(1.,0.));
+#228 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#237 = ADVANCED_FACE('',(#238),#100,.F.);
+#238 = FACE_BOUND('',#239,.F.);
+#239 = EDGE_LOOP('',(#240,#261,#276,#283));
+#240 = ORIENTED_EDGE('',*,*,#241,.F.);
+#241 = EDGE_CURVE('',#242,#244,#246,.T.);
+#242 = VERTEX_POINT('',#243);
+#243 = CARTESIAN_POINT('',(5.,5.,-50.));
+#244 = VERTEX_POINT('',#245);
+#245 = CARTESIAN_POINT('',(5.,5.,50.));
+#246 = SURFACE_CURVE('',#247,(#251,#258),.PCURVE_S1.);
+#247 = LINE('',#248,#249);
+#248 = CARTESIAN_POINT('',(5.,5.,-50.));
+#249 = VECTOR('',#250,1.);
+#250 = DIRECTION('',(0.,0.,1.));
+#251 = PCURVE('',#100,#252);
+#252 = DEFINITIONAL_REPRESENTATION('',(#253),#257);
+#253 = LINE('',#254,#255);
+#254 = CARTESIAN_POINT('',(10.,0.));
+#255 = VECTOR('',#256,1.);
+#256 = DIRECTION('',(0.,1.));
+#257 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#258 = PCURVE('',#159,#259);
+#259 = DEFINITIONAL_REPRESENTATION('',(#260),#260);
+#261 = ORIENTED_EDGE('',*,*,#262,.T.);
+#262 = EDGE_CURVE('',#242,#57,#264,.T.);
+#263 = SURFACE_CURVE('',#264,(#268,#270),.PCURVE_S1.);
+#264 = LINE('',#265,#266);
+#265 = CARTESIAN_POINT('',(-5.,5.,-50.));
+#266 = VECTOR('',#267,1.);
+#267 = DIRECTION('',(1.,0.,0.));
+#268 = PCURVE('',#100,#269);
+#269 = DEFINITIONAL_REPRESENTATION('',(#270),#270);
+#276 = ORIENTED_EDGE('',*,*,#84,.T.);
+#283 = ORIENTED_EDGE('',*,*,#284,.F.);
+#284 = EDGE_CURVE('',#244,#85,#286,.T.);
+#285 = SURFACE_CURVE('',#286,(#290,#297),.PCURVE_S1.);
+#286 = LINE('',#287,#288);
+#287 = CARTESIAN_POINT('',(-5.,5.,50.));
+#288 = VECTOR('',#289,1.);
+#289 = DIRECTION('',(1.,0.,0.));
+#290 = PCURVE('',#100,#291);
+#291 = DEFINITIONAL_REPRESENTATION('',(#292),#296);
+#292 = LINE('',#293,#294);
+#293 = CARTESIAN_POINT('',(0.,100.));
+#294 = VECTOR('',#295,1.);
+#295 = DIRECTION('',(1.,0.));
+#296 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#297 = PCURVE('',#126,#298);
+#298 = DEFINITIONAL_REPRESENTATION('',(#299),#303);
+#299 = LINE('',#300,#301);
+#300 = CARTESIAN_POINT('',(0.,10.));
+#301 = VECTOR('',#302,1.);
+#302 = DIRECTION('',(1.,0.));
+#303 = ( GEOMETRIC_REPRESENTATION_CONTEXT(2) PARAMETRIC_REPRESENTATION_CONTEXT() REPRESENTATION_CONTEXT('2D SPACE','') );
+#331 = ADVANCED_FACE('',(#332),#72,.F.);
+#332 = FACE_BOUND('',#333,.F.);
+#333 = EDGE_LOOP('',(#334,#335,#336,#337));
+#334 = ORIENTED_EDGE('',*,*,#56,.F.);
+#335 = ORIENTED_EDGE('',*,*,#241,.T.);
+#336 = ORIENTED_EDGE('',*,*,#171,.T.);
+#337 = ORIENTED_EDGE('',*,*,#288,.F.);
+#338 = ADVANCED_FACE('',(#339),#126,.T.);
+#339 = FACE_BOUND('',#340,.T.);
+#340 = EDGE_LOOP('',(#341,#342,#343,#344));
+#341 = ORIENTED_EDGE('',*,*,#112,.F.);
+#342 = ORIENTED_EDGE('',*,*,#263,.T.);
+#343 = ORIENTED_EDGE('',*,*,#217,.T.);
+#344 = ORIENTED_EDGE('',*,*,#310,.F.);
+#345 = ( GEOMETRIC_REPRESENTATION_CONTEXT(3) GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#349)) GLOBAL_UNIT_ASSIGNED_CONTEXT((#346,#347,#348)) REPRESENTATION_CONTEXT('Context #1','3D Context with UNIT and UNCERTAINTY') );
+#346 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) );
+#347 = ( NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.) );
+#348 = ( NAMED_UNIT(*) SI_UNIT($,.STERADIAN.) SOLID_ANGLE_UNIT() );
+#349 = UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-07),#346,'distance_accuracy_value','confusion accuracy');
+#350 = PRODUCT_RELATED_PRODUCT_CATEGORY('part',$,(#7));
+ENDSEC;
+END-ISO-10303-21;
+"""
+
 
 def generate_step_file(material_name, properties=None, extra_metadata=None):
     """
-    Generate a valid 3D CAD STEP file (AP214 / AP242) containing a 3D solid body
-    (using Open CASCADE / CadQuery) with embedded material properties
-    (density, yield strength, tensile strength, elastic modulus, thermal conductivity,
-    carbon footprint, cost, standards, and custom user properties).
+    Generate an ISO 10303 STEP AP214 file containing an Open CASCADE validated
+    3D solid specimen block (10x10x100mm) with embedded material property metadata.
     """
     sanitized_id = re.sub(r'[^a-zA-Z0-9]', '_', str(material_name))
     sanitized_name = str(material_name).replace("'", "").replace('"', "")
@@ -56,246 +352,64 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
     except Exception:
         base_step = None
 
-    if base_step:
-        base_step = re.sub(
-            r"FILE_DESCRIPTION\(\([^)]*\),'2;1'\);",
-            f"FILE_DESCRIPTION(('Material Specimen: {sanitized_name}','{header_desc}','ASTM Tensile Specimen Block (10x10x100mm)'),'2;1');",
-            base_step
+    if not base_step:
+        base_step = OCCT_SOLID_TEMPLATE.format(
+            sanitized_name=sanitized_name,
+            sanitized_id=sanitized_id,
+            header_desc=header_desc,
+            timestamp=timestamp,
         )
-        base_step = re.sub(
-            r"FILE_NAME\([^;]*\);",
-            f"FILE_NAME('{sanitized_id}_specimen.stp','{timestamp}',('AI Material Selector'),('AI Material Selector'),'2.0','AI Material Selector','{sanitized_name} - {header_desc}');",
-            base_step
-        )
-        
-        entity_matches = re.findall(r"#(\d+)\s*=", base_step)
-        max_id = max([int(m) for m in entity_matches]) if entity_matches else 500
-        start_id = max_id + 10
-        
-        pd_shape_match = re.search(r"#(\d+)\s*=\s*PRODUCT_DEFINITION_SHAPE", base_step)
-        pd_shape_id = f"#{pd_shape_match.group(1)}" if pd_shape_match else "#4"
 
-        solid_match = re.search(r"#(\d+)\s*=\s*MANIFOLD_SOLID_BREP", base_step)
-        solid_id = f"#{solid_match.group(1)}" if solid_match else pd_shape_id
+    base_step = re.sub(
+        r"FILE_DESCRIPTION\(\([^)]*\),'2;1'\);",
+        f"FILE_DESCRIPTION(('Material Specimen: {sanitized_name}','{header_desc}','ASTM Tensile Specimen Block (10x10x100mm)'),'2;1');",
+        base_step
+    )
+    base_step = re.sub(
+        r"FILE_NAME\([^;]*\);",
+        f"FILE_NAME('{sanitized_id}_specimen.stp','{timestamp}',('AI Material Selector'),('AI Material Selector'),'2.0','AI Material Selector','{sanitized_name} - {header_desc}');",
+        base_step
+    )
+    
+    entity_matches = re.findall(r"#(\d+)\s*=", base_step)
+    max_id = max([int(m) for m in entity_matches]) if entity_matches else 500
+    start_id = max_id + 10
+    
+    pd_shape_match = re.search(r"#(\d+)\s*=\s*PRODUCT_DEFINITION_SHAPE", base_step)
+    pd_shape_id = f"#{pd_shape_match.group(1)}" if pd_shape_match else "#4"
 
-        mat_entities = []
-        mat_entities.append(f"#{start_id}=MATERIAL_DESIGNATION('{sanitized_name}',({solid_id},{pd_shape_id}));")
-        mat_entities.append(f"#{start_id+1}=MATERIAL_PROPERTY('','material designation',{solid_id});")
-        mat_entities.append(f"#{start_id+2}=DESCRIPTIVE_REPRESENTATION_ITEM('material_name','{sanitized_name}');")
-        mat_entities.append(f"#{start_id+3}=REPRESENTATION('material designation representation',(#{start_id+2}),#10);")
-        mat_entities.append(f"#{start_id+4}=PROPERTY_DEFINITION_REPRESENTATION(#{start_id+1},#{start_id+3});")
-        
-        density_val = clean_props.get("Density (g/cm³)", clean_props.get("Density", ""))
-        cur_id = start_id + 10
-        if density_val:
-            mat_entities.append(f"#{cur_id}=MATERIAL_PROPERTY('density','density',{solid_id});")
-            mat_entities.append(f"#{cur_id+1}=DESCRIPTIVE_REPRESENTATION_ITEM('density','{density_val} g/cm3');")
-            mat_entities.append(f"#{cur_id+2}=REPRESENTATION('density representation',(#{cur_id+1}),#10);")
-            mat_entities.append(f"#{cur_id+3}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id},#{cur_id+2});")
-            cur_id += 10
+    solid_match = re.search(r"#(\d+)\s*=\s*MANIFOLD_SOLID_BREP", base_step)
+    solid_id = f"#{solid_match.group(1)}" if solid_match else pd_shape_id
 
-        for prop_key, prop_val in clean_props.items():
-            if prop_key in ["Material Name", "Density (g/cm³)", "Density"]:
-                continue
-            safe_key = re.sub(r'[^a-zA-Z0-9_]', '_', prop_key).lower()
-            safe_val = str(prop_val).replace("'", "''")
-            mat_entities.append(f"#{cur_id}=MATERIAL_PROPERTY('{safe_key}','{prop_key}',{solid_id});")
-            mat_entities.append(f"#{cur_id+1}=DESCRIPTIVE_REPRESENTATION_ITEM('{safe_key}','{safe_val}');")
-            mat_entities.append(f"#{cur_id+2}=REPRESENTATION('{safe_key} representation',(#{cur_id+1}),#10);")
-            mat_entities.append(f"#{cur_id+3}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id},#{cur_id+2});")
-            cur_id += 10
-
-        mat_str = "\n".join(mat_entities)
-        parts = base_step.split("ENDSEC;", 1)
-        return parts[0] + mat_str + "\nENDSEC;" + parts[1]
-
-    # Fallback to pure B-Rep STEP generator
-    data_property_entities = []
+    mat_entities = []
+    mat_entities.append(f"#{start_id}=MATERIAL_DESIGNATION('{sanitized_name}',({solid_id},{pd_shape_id}));")
+    mat_entities.append(f"#{start_id+1}=MATERIAL_PROPERTY('','material designation',{solid_id});")
+    mat_entities.append(f"#{start_id+2}=DESCRIPTIVE_REPRESENTATION_ITEM('material_name','{sanitized_name}');")
+    mat_entities.append(f"#{start_id+3}=REPRESENTATION('material designation representation',(#{start_id+2}),#345);")
+    mat_entities.append(f"#{start_id+4}=PROPERTY_DEFINITION_REPRESENTATION(#{start_id+1},#{start_id+3});")
+    
     density_val = clean_props.get("Density (g/cm³)", clean_props.get("Density", ""))
-
-    data_property_entities.append(f"#160=MATERIAL_DESIGNATION('{sanitized_name}',(#141,#142,#146,#149,#150));")
-    data_property_entities.append(f"#161=MATERIAL_PROPERTY('','material designation',#141);")
-    data_property_entities.append(f"#162=DESCRIPTIVE_REPRESENTATION_ITEM('material_name','{sanitized_name}');")
-    data_property_entities.append(f"#163=REPRESENTATION('material designation representation',(#162),#6);")
-    data_property_entities.append(f"#164=PROPERTY_DEFINITION_REPRESENTATION(#161,#163);")
-
+    cur_id = start_id + 10
     if density_val:
-        data_property_entities.append(f"#165=MATERIAL_PROPERTY('density','density',#141);")
-        data_property_entities.append(f"#166=DESCRIPTIVE_REPRESENTATION_ITEM('density','{density_val} g/cm3');")
-        data_property_entities.append(f"#167=REPRESENTATION('density representation',(#166),#6);")
-        data_property_entities.append(f"#168=PROPERTY_DEFINITION_REPRESENTATION(#165,#167);")
+        mat_entities.append(f"#{cur_id}=MATERIAL_PROPERTY('density','density',{solid_id});")
+        mat_entities.append(f"#{cur_id+1}=DESCRIPTIVE_REPRESENTATION_ITEM('density','{density_val} g/cm3');")
+        mat_entities.append(f"#{cur_id+2}=REPRESENTATION('density representation',(#{cur_id+1}),#345);")
+        mat_entities.append(f"#{cur_id+3}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id},#{cur_id+2});")
+        cur_id += 10
 
-    entity_id = 170
     for prop_key, prop_val in clean_props.items():
         if prop_key in ["Material Name", "Density (g/cm³)", "Density"]:
             continue
         safe_key = re.sub(r'[^a-zA-Z0-9_]', '_', prop_key).lower()
         safe_val = str(prop_val).replace("'", "''")
-        
-        p_def = entity_id
-        d_item = entity_id + 1
-        rep = entity_id + 2
-        p_rep = entity_id + 3
-        
-        data_property_entities.append(f"#{p_def}=MATERIAL_PROPERTY('{safe_key}','{prop_key}',#141);")
-        data_property_entities.append(f"#{d_item}=DESCRIPTIVE_REPRESENTATION_ITEM('{safe_key}','{safe_val}');")
-        data_property_entities.append(f"#{rep}=REPRESENTATION('{safe_key} representation',(#{d_item}),#6);")
-        data_property_entities.append(f"#{p_rep}=PROPERTY_DEFINITION_REPRESENTATION(#{p_def},#{rep});")
-        
-        entity_id += 10
+        mat_entities.append(f"#{cur_id}=MATERIAL_PROPERTY('{safe_key}','{prop_key}',{solid_id});")
+        mat_entities.append(f"#{cur_id+1}=DESCRIPTIVE_REPRESENTATION_ITEM('{safe_key}','{safe_val}');")
+        mat_entities.append(f"#{cur_id+2}=REPRESENTATION('{safe_key} representation',(#{cur_id+1}),#345);")
+        mat_entities.append(f"#{cur_id+3}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id},#{cur_id+2});")
+        cur_id += 10
 
-    properties_entities_str = "\n".join(data_property_entities)
+    mat_str = "\n".join(mat_entities)
+    parts = base_step.split("ENDSEC;", 1)
+    return parts[0] + mat_str + "\nENDSEC;" + parts[1]
 
-    step_content = f"""ISO-10303-21;
-HEADER;
-FILE_DESCRIPTION(('Material Specimen: {sanitized_name}','{header_desc}','ASTM Tensile Specimen Block (10x10x100mm)'),'2;1');
-FILE_NAME('{sanitized_id}_specimen.stp','{timestamp}',('AI Material Selector'),('AI Material Selector'),'2.0','AI Material Selector','{sanitized_name} - {header_desc}');
-FILE_SCHEMA(('AUTOMOTIVE_DESIGN {{1 0 10303 214 1 1 1 1}}','AP242_MANAGED_MODEL_BASED_3D_ENGINEERING {{1 0 10303 242 1 1 1 1}}'));
-ENDSEC;
-DATA;
-/* Geometric Representation Context & Units */
-#1=(GEOMETRIC_REPRESENTATION_CONTEXT(3) GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#2)) GLOBAL_UNIT_ASSIGNED_CONTEXT((#3,#4,#5)) REPRESENTATION_CONTEXT('3D Context','3D Context with mm units'));
-#2=UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-05),#3,'distance_accuracy_value','confusion accuracy');
-#3=(LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.));
-#4=(NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.));
-#5=(NAMED_UNIT(*) SOLID_ANGLE_UNIT() SI_UNIT($,.STERADIAN.));
-
-/* Axis Placement & Origin */
-#6=CARTESIAN_POINT('Origin',(0.0,0.0,0.0));
-#7=DIRECTION('Axis',(0.0,0.0,1.0));
-#8=DIRECTION('RefDir',(1.0,0.0,0.0));
-#9=AXIS2_PLACEMENT_3D('Placement',#6,#7,#8);
-
-/* Block Geometry Vertices (10mm x 10mm x 100mm Solid Specimen Block) */
-#10=CARTESIAN_POINT('',(0.0,0.0,0.0));
-#11=CARTESIAN_POINT('',(10.0,0.0,0.0));
-#12=CARTESIAN_POINT('',(10.0,10.0,0.0));
-#13=CARTESIAN_POINT('',(0.0,10.0,0.0));
-#14=CARTESIAN_POINT('',(0.0,0.0,100.0));
-#15=CARTESIAN_POINT('',(10.0,0.0,100.0));
-#16=CARTESIAN_POINT('',(10.0,10.0,100.0));
-#17=CARTESIAN_POINT('',(0.0,10.0,100.0));
-
-#20=VERTEX_POINT('',#10);
-#21=VERTEX_POINT('',#11);
-#22=VERTEX_POINT('',#12);
-#23=VERTEX_POINT('',#13);
-#24=VERTEX_POINT('',#14);
-#25=VERTEX_POINT('',#15);
-#26=VERTEX_POINT('',#16);
-#27=VERTEX_POINT('',#17);
-
-#30=DIRECTION('',(1.0,0.0,0.0));
-#31=DIRECTION('',(0.0,1.0,0.0));
-#32=DIRECTION('',(0.0,0.0,1.0));
-#33=DIRECTION('',(-1.0,0.0,0.0));
-#34=DIRECTION('',(0.0,-1.0,0.0));
-#35=DIRECTION('',(0.0,0.0,-1.0));
-
-#40=LINE('',#10,#30);
-#41=LINE('',#11,#31);
-#42=LINE('',#12,#33);
-#43=LINE('',#13,#34);
-#44=LINE('',#14,#30);
-#45=LINE('',#15,#31);
-#46=LINE('',#16,#33);
-#47=LINE('',#17,#34);
-#48=LINE('',#10,#32);
-#49=LINE('',#11,#32);
-#50=LINE('',#12,#32);
-#51=LINE('',#13,#32);
-
-#60=EDGE_CURVE('',#20,#21,#40,.T.);
-#61=EDGE_CURVE('',#21,#22,#41,.T.);
-#62=EDGE_CURVE('',#22,#23,#42,.T.);
-#63=EDGE_CURVE('',#23,#20,#43,.T.);
-#64=EDGE_CURVE('',#24,#25,#44,.T.);
-#65=EDGE_CURVE('',#25,#26,#45,.T.);
-#66=EDGE_CURVE('',#26,#27,#46,.T.);
-#67=EDGE_CURVE('',#27,#24,#47,.T.);
-#68=EDGE_CURVE('',#20,#24,#48,.T.);
-#69=EDGE_CURVE('',#21,#25,#49,.T.);
-#70=EDGE_CURVE('',#22,#26,#50,.T.);
-#71=EDGE_CURVE('',#23,#27,#51,.T.);
-
-#80=ORIENTED_EDGE('',*,*,#60,.T.);
-#81=ORIENTED_EDGE('',*,*,#61,.T.);
-#82=ORIENTED_EDGE('',*,*,#62,.T.);
-#83=ORIENTED_EDGE('',*,*,#63,.T.);
-#84=EDGE_LOOP('',(#80,#81,#82,#83));
-#85=FACE_OUTER_BOUND('',#84,.T.);
-#86=AXIS2_PLACEMENT_3D('',#10,#35,#30);
-#87=PLANE('',#86);
-#88=ADVANCED_FACE('',(#85),#87,.F.);
-
-#90=ORIENTED_EDGE('',*,*,#64,.T.);
-#91=ORIENTED_EDGE('',*,*,#65,.T.);
-#92=ORIENTED_EDGE('',*,*,#66,.T.);
-#93=ORIENTED_EDGE('',*,*,#67,.T.);
-#94=EDGE_LOOP('',(#90,#91,#92,#93));
-#95=FACE_OUTER_BOUND('',#94,.T.);
-#96=AXIS2_PLACEMENT_3D('',#14,#32,#30);
-#97=PLANE('',#96);
-#98=ADVANCED_FACE('',(#95),#97,.T.);
-
-#100=ORIENTED_EDGE('',*,*,#60,.T.);
-#101=ORIENTED_EDGE('',*,*,#69,.T.);
-#102=ORIENTED_EDGE('',*,*,#64,.F.);
-#103=ORIENTED_EDGE('',*,*,#68,.F.);
-#104=EDGE_LOOP('',(#100,#101,#102,#103));
-#105=FACE_OUTER_BOUND('',#104,.T.);
-#106=AXIS2_PLACEMENT_3D('',#10,#34,#30);
-#107=PLANE('',#106);
-#108=ADVANCED_FACE('',(#105),#107,.T.);
-
-#110=ORIENTED_EDGE('',*,*,#61,.T.);
-#111=ORIENTED_EDGE('',*,*,#70,.T.);
-#112=ORIENTED_EDGE('',*,*,#65,.F.);
-#113=ORIENTED_EDGE('',*,*,#69,.F.);
-#114=EDGE_LOOP('',(#110,#111,#112,#113));
-#115=FACE_OUTER_BOUND('',#114,.T.);
-#116=AXIS2_PLACEMENT_3D('',#11,#30,#31);
-#117=PLANE('',#116);
-#118=ADVANCED_FACE('',(#115),#117,.T.);
-
-#120=ORIENTED_EDGE('',*,*,#62,.T.);
-#121=ORIENTED_EDGE('',*,*,#71,.T.);
-#122=ORIENTED_EDGE('',*,*,#66,.F.);
-#123=ORIENTED_EDGE('',*,*,#70,.F.);
-#124=EDGE_LOOP('',(#120,#121,#122,#123));
-#125=FACE_OUTER_BOUND('',#124,.T.);
-#126=AXIS2_PLACEMENT_3D('',#12,#31,#33);
-#127=PLANE('',#126);
-#128=ADVANCED_FACE('',(#125),#127,.T.);
-
-#130=ORIENTED_EDGE('',*,*,#63,.T.);
-#131=ORIENTED_EDGE('',*,*,#68,.T.);
-#132=ORIENTED_EDGE('',*,*,#67,.F.);
-#133=ORIENTED_EDGE('',*,*,#71,.F.);
-#134=EDGE_LOOP('',(#130,#131,#132,#133));
-#135=FACE_OUTER_BOUND('',#134,.T.);
-#136=AXIS2_PLACEMENT_3D('',#13,#33,#34);
-#137=PLANE('',#136);
-#138=ADVANCED_FACE('',(#135),#137,.T.);
-
-/* Solid Body & Assembly Topology */
-#140=CLOSED_SHELL('Solid Shell',(#88,#98,#108,#118,#128,#138));
-#141=MANIFOLD_SOLID_BREP('{sanitized_id}_Specimen_Solid',#140);
-#142=ADVANCED_BREP_SHAPE_REPRESENTATION('{sanitized_id}_Specimen_Shape',(#141,#9),#1);
-
-#143=APPLICATION_CONTEXT('automotive design');
-#144=APPLICATION_PROTOCOL_DEFINITION('international standard','automotive_design',2000,#143);
-#145=PRODUCT_CONTEXT('mechanical',#143,'mechanical');
-#146=PRODUCT('{sanitized_id}_Part','{sanitized_name}_Part','{sanitized_name} Solid Specimen Block',(#145));
-#147=PRODUCT_DEFINITION_FORMATION('1','1',#146);
-#148=PRODUCT_DEFINITION_CONTEXT('part definition',#143,'design');
-#149=PRODUCT_DEFINITION('design','{sanitized_name} Specimen',#147,#148);
-#150=PRODUCT_DEFINITION_SHAPE('Shape For Product',$,#149);
-#151=SHAPE_DEFINITION_REPRESENTATION(#150,#142);
-
-{properties_entities_str}
-ENDSEC;
-END-ISO-10303-21;
-"""
-    return step_content
 

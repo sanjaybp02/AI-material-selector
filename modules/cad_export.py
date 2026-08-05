@@ -52,9 +52,9 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
     # Build STEP DATA section property entities starting after #147
     data_property_entities = []
     
-    # #150: Material designation
+    # #150: Material designation & material property definitions for AP214 / AP242 CAD readers (SpaceClaim, SolidWorks, ANSYS)
     data_property_entities.append(f"#150=MATERIAL_DESIGNATION('{sanitized_name}',(#145));")
-    data_property_entities.append(f"#151=PROPERTY_DEFINITION('material property','material designation',#145);")
+    data_property_entities.append(f"#151=MATERIAL_PROPERTY('','material designation',#145);")
     data_property_entities.append(f"#152=DESCRIPTIVE_REPRESENTATION_ITEM('material_name','{sanitized_name}');")
     data_property_entities.append(f"#153=REPRESENTATION('material designation representation',(#152),#6);")
     data_property_entities.append(f"#154=PROPERTY_DEFINITION_REPRESENTATION(#151,#153);")
@@ -71,7 +71,7 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
         rep = entity_id + 2
         p_rep = entity_id + 3
         
-        data_property_entities.append(f"#{p_def}=PROPERTY_DEFINITION('material property','{prop_key}',#145);")
+        data_property_entities.append(f"#{p_def}=MATERIAL_PROPERTY('{safe_key}','{prop_key}',#145);")
         data_property_entities.append(f"#{d_item}=DESCRIPTIVE_REPRESENTATION_ITEM('{safe_key}','{safe_val}');")
         data_property_entities.append(f"#{rep}=REPRESENTATION('{safe_key} representation',(#{d_item}),#6);")
         data_property_entities.append(f"#{p_rep}=PROPERTY_DEFINITION_REPRESENTATION(#{p_def},#{rep});")
@@ -84,7 +84,7 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
 HEADER;
 FILE_DESCRIPTION(('Material Specimen: {sanitized_name}','{header_desc}','ASTM Tensile Specimen block (10x10x100mm)'),'2;1');
 FILE_NAME('{sanitized_id}_specimen.stp','{timestamp}',('AI Material Selector'),('AI Material Selector'),'2.0','AI Material Selector','');
-FILE_SCHEMA(('AUTOMOTIVE_DESIGN {{1 0 10303 214 1 1 1 1}}'));
+FILE_SCHEMA(('AP242_MANAGED_MODEL_BASED_3D_ENGINEERING {{1 0 10303 242 1 1 1 1}}','AUTOMOTIVE_DESIGN {{1 0 10303 214 1 1 1 1}}'));
 ENDSEC;
 DATA;
 #1=DIRECTION('',(0.0,0.0,1.0));

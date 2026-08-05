@@ -266,16 +266,16 @@ div[data-testid="stChatMessage"] {{
     position: fixed !important;
     bottom: 3.2rem !important;
     right: 1.5rem !important;
-    font-size: 0.85rem !important;
-    font-weight: 700 !important;
-    color: #ffffff !important;
-    background: #0f172a !important;
+    font-size: 0.78rem !important;
+    font-weight: 500 !important;
+    color: #8b949e !important;
+    background: rgba(22, 27, 34, 0.85) !important;
     opacity: 1 !important;
-    filter: none !important;
-    padding: 6px 18px !important;
-    border-radius: 25px !important;
-    border: 1.5px solid #38bdf8 !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8), 0 0 15px rgba(56, 189, 248, 0.6) !important;
+    padding: 5px 14px !important;
+    border-radius: 20px !important;
+    border: 1px solid rgba(48, 54, 61, 0.7) !important;
+    backdrop-filter: blur(8px) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
     z-index: 999999 !important;
     pointer-events: none !important;
     text-align: center !important;
@@ -291,10 +291,11 @@ div[data-testid="stChatMessage"] {{
     outline: none !important;
     padding: 0 !important;
     margin: 0 !important;
-    color: #ffffff !important;
-    font-weight: 700 !important;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 0 20px rgba(56, 189, 248, 0.8) !important;
+    color: #8b949e !important;
+    font-weight: 500 !important;
+    text-shadow: none !important;
 }}
+
 
 
 

@@ -6,3 +6,4 @@ requests
 plotly
 python-dotenv
 openpyxl
+starlette<=0.41.3

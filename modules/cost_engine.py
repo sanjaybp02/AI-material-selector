@@ -14,7 +14,9 @@ def fetch_live_metal_price(material_name):
     (price_per_kg_inr, error_message)
         price is float or None, error is str or None.
     """
-    api_key = os.getenv("METALPRICE_API_KEY", "***REMOVED-METALPRICEAPI-KEY-REVOKED***")
+    api_key = os.getenv("METALPRICE_API_KEY")
+    if not api_key:
+        return None, "METALPRICE_API_KEY is not set — add it as an environment variable or Streamlit secret to enable live pricing."
     mat_lower = material_name.lower()
     symbol = None
     if "aluminum" in mat_lower or "alumin" in mat_lower:

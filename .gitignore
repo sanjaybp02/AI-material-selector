@@ -11,9 +11,19 @@ settings.json
 # Local databases
 history.db
 
+# Runtime logs
+*.log
+
 # Output exports
 *.pdf
 *.stp
 *.xlsx
 *.csv
 !materials.csv
+
+# Local scratch/dev artifacts
+scratch/
+
+# AI tooling local state (machine-specific, not project content)
+.claude/
+.agents/

@@ -91,24 +91,68 @@ html, body, [class*="css"] {{
     font-family: 'Inter', sans-serif !important;
 }}
 code, pre, kbd, samp,
-div[data-testid="stCodeBlock"] *,
+div[data-testid="stCode"] *,
 [data-testid="stApp"] code, [data-testid="stApp"] pre {{
     font-family: 'JetBrains Mono', monospace !important;
 }}
 
-/* ── Cards & containers ── */
+/* ── Cards & containers ──
+   NOTE on the Step 1/2/3 card selector: in older Streamlit,
+   st.container(border=True) rendered inside a dedicated
+   [data-testid="stVerticalBlockBorderWrapper"] element, which is what
+   this rule originally targeted. This Streamlit build (1.5x) removed
+   that wrapper — the border is now applied directly to the plain
+   [data-testid="stVerticalBlock"], indistinguishable by testid alone
+   from any other vertical layout block (columns, etc.), and using
+   Streamlit's own default translucent border color, not this design's.
+   Confirmed by walking the live DOM, not assumed.
+
+   A :has()-based selector (matching on the existing tour-step-N-anchor
+   marker) correctly identified the right elements in the CSSOM — but
+   produced inconsistent *computed* styles across otherwise-identical
+   elements (verified: same matched rule set, same specificity, same
+   !important, different final color), a real browser :has() computed-
+   style bug, not a selector-correctness problem. Rather than depend on
+   a selector feature that's demonstrably unreliable here, mark_step_cards()
+   (called once per app.py run, see bottom of this file) walks up from
+   each anchor in JS and adds a plain .step-card class to its
+   stVerticalBlock ancestor — ordinary class matching, no engine quirk
+   possible. */
+/* border-top is set exactly once per element (never redefined by a
+   shorthand `border` in one rule and a longhand `border-top` in
+   another) — a shorthand/longhand split across two same-specificity
+   rules is a well-known source of hard-to-diagnose cascade bugs, so
+   it's avoided entirely here rather than relied on to resolve
+   correctly by source order. */
 div[data-testid="stExpander"],
-div[data-testid="stMetric"],
-div[data-testid="stVerticalBlockBorderWrapper"] {{
+div[data-testid="stMetric"] {{
     background: var(--surface) !important;
     border-radius: var(--radius) !important;
-    border: 1px solid var(--border) !important;
+    border-top: 1px solid var(--border) !important;
+    border-right: 1px solid var(--border) !important;
+    border-bottom: 1px solid var(--border) !important;
+    border-left: 1px solid var(--border) !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
     transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease !important;
 }}
+/* Step 1/2/3 cards: same surface/shadow treatment, plus a distinct
+   accent top-edge instead of a plain grey border-top. */
+div[data-testid="stVerticalBlock"].step-card {{
+    background: var(--surface) !important;
+    border-radius: var(--radius-lg) !important;
+    border-top: 2px solid var(--accent) !important;
+    border-right: 1px solid var(--border) !important;
+    border-bottom: 1px solid var(--border) !important;
+    border-left: 1px solid var(--border) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+    padding-top: 20px !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}}
 
-div[data-testid="stVerticalBlockBorderWrapper"]:hover {{
-    border-color: var(--border-hover) !important;
+div[data-testid="stVerticalBlock"].step-card:hover {{
+    border-right-color: var(--border-hover) !important;
+    border-bottom-color: var(--border-hover) !important;
+    border-left-color: var(--border-hover) !important;
 }}
 /* Lift is scoped to the smaller card-like elements (metrics, expanders) —
    not the large Step 1/2/3 containers, where a hover-shift would feel
@@ -118,6 +162,13 @@ div[data-testid="stMetric"]:hover {{
     border-color: var(--border-hover) !important;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
     transform: translateY(-2px) !important;
+}}
+/* Expanders nested inside a Step card sit one level deeper — a recessed
+   (darker) background instead of matching their parent's surface color
+   makes that nesting read as intentional depth, not a redundant box
+   sharing an accidental border with its parent. */
+div[data-testid="stVerticalBlock"].step-card div[data-testid="stExpander"] {{
+    background: var(--surface-inset) !important;
 }}
 
 /* stMetric value: monospace for an instrument-panel feel on numeric readouts */
@@ -278,14 +329,14 @@ hr {{
 }}
 .hero-title {{
     margin: 0;
-    font-size: 2rem;
+    font-size: 1.65rem;
     font-weight: 700;
     line-height: 1.25;
     color: var(--text-heading) !important;
 }}
 .hero-subtitle {{
-    margin: 8px 0 0 0;
-    font-size: 0.95rem;
+    margin: 6px 0 0 0;
+    font-size: 0.875rem;
     color: var(--text-muted);
     font-weight: 400;
     max-width: 700px;
@@ -710,6 +761,53 @@ def render_footer():
         '<div class="app-footer"><span>made with ❤️ by sanjay_bp</span></div>',
         unsafe_allow_html=True,
     )
+
+
+def mark_step_cards():
+    """Add a plain `.step-card` class to the stVerticalBlock ancestor of
+    each tour-step-N-anchor (Step 1/2/3), so CSS can style them via
+    ordinary class matching instead of :has() — see the long comment in
+    inject_theme() for why :has() was dropped here. Safe to call once per
+    script run: re-finds and re-marks on every rerun since Streamlit
+    re-renders the whole DOM each time, and classList.add is idempotent
+    if a node happens to persist. Bounded ancestor walk (12 levels) so a
+    future markup change fails silently instead of mismarking something
+    unrelated."""
+    js_code = """
+    <script>
+        (function() {
+            var attempts = 0;
+            var interval = setInterval(function() {
+                attempts++;
+                var doc = document;
+                try {
+                    if (window.parent && window.parent.document) doc = window.parent.document;
+                } catch(e) {}
+                try {
+                    if (window.top && window.top.document) doc = window.top.document;
+                } catch(e) {}
+
+                var anchors = doc.querySelectorAll('[id^="tour-step-"]');
+                if (anchors.length > 0) {
+                    anchors.forEach(function(anchor) {
+                        var node = anchor;
+                        for (var i = 0; i < 12 && node; i++) {
+                            if (node.getAttribute && node.getAttribute('data-testid') === 'stVerticalBlock') {
+                                node.classList.add('step-card');
+                                break;
+                            }
+                            node = node.parentElement;
+                        }
+                    });
+                    clearInterval(interval);
+                } else if (attempts >= 30) {
+                    clearInterval(interval);
+                }
+            }, 100);
+        })();
+    </script>
+    """
+    st.components.v1.html(js_code, height=0, width=0)
 
 
 def scroll_to_anchor(anchor_id: str, attempts: int = 30, delay_ms: int = 100):

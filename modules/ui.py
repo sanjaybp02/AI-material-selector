@@ -70,7 +70,30 @@ def inject_theme():
 }}
 
 html, body, [class*="css"] {{
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', sans-serif !important;
+}}
+/* Streamlit injects its own per-component rules like
+   ".st-emotion-cache-XXXX h1, h2, h3, ..." that target heading/text
+   tags *directly* — confirmed by walking document.styleSheets and
+   finding exactly this selector setting font-family to "Source Sans"
+   (traced in-browser, not guessed). Those rules have no !important, but
+   they still won over the block above because that block only sets
+   font-family on elements whose *own* class contains "css" (the
+   wrapper divs) — h1/p/span never match it directly, so they only
+   inherited Inter from their parent, and a direct (even unimportant,
+   even lower-specificity) rule on the element itself always beats an
+   inherited value. Result: headings/captions/labels silently fell back
+   to Source Sans while only directly-styled elements kept Inter — a
+   visibly inconsistent mix of two fonts on the same page. Fixed by
+   directly targeting every text-bearing tag with !important instead of
+   relying on inheritance. */
+[data-testid="stApp"] :is(h1, h2, h3, h4, h5, h6, p, span, div, label, li, a, td, th, button, textarea, input) {{
+    font-family: 'Inter', sans-serif !important;
+}}
+code, pre, kbd, samp,
+div[data-testid="stCodeBlock"] *,
+[data-testid="stApp"] code, [data-testid="stApp"] pre {{
+    font-family: 'JetBrains Mono', monospace !important;
 }}
 
 /* ── Cards & containers ── */

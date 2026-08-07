@@ -250,6 +250,9 @@ def render_cad_studio(df_display, rec_names):
     source_mode = st.radio(
         "Source", ["Generate specimen", "Upload your model"], horizontal=True, key="cad_studio_source",
     )
+    if st.session_state.get("cad_studio_last_source") != source_mode:
+        st.session_state.pop("cad_studio_result", None)
+        st.session_state["cad_studio_last_source"] = source_mode
 
     if source_mode == "Generate specimen":
         cq_ok = cadquery_available()

@@ -2,6 +2,14 @@
 toolbarMode = "minimal"
 showErrorDetails = false
 
+[server]
+# Matches cad_engine.MAX_UPLOAD_BYTES exactly, so the file_uploader widget's
+# own advertised limit ("Xmb per file") is honest and Streamlit rejects an
+# oversized file immediately at the widget, instead of the user waiting for
+# an upload (Streamlit's default is 200MB) only to have cad_engine reject it
+# afterward with a mismatched, confusing limit.
+maxUploadSize = 15
+
 [theme]
 base = "dark"
 primaryColor = "#58a6ff"

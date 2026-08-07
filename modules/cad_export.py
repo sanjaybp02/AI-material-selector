@@ -452,6 +452,12 @@ def apply_material_metadata(step_text, material_name, properties=None):
     """
     sanitized_name = str(material_name).replace("'", "").replace('"', "")
 
+    # clean_props holds display-formatted but *unescaped* values — quote
+    # escaping happens exactly once, in _emit_property below, which is the
+    # only place these values get embedded into a STEP string literal.
+    # Escaping here too would double-escape every apostrophe (confirmed:
+    # values were coming out with 4x the intended quote characters before
+    # this fix).
     clean_props = {}
     if isinstance(properties, dict):
         for k, v in properties.items():
@@ -460,7 +466,7 @@ def apply_material_metadata(step_text, material_name, properties=None):
                     val_str = f"{v:.4g}" if abs(v) < 10000 else f"{v:.2f}"
                 else:
                     val_str = str(v)
-                clean_props[str(k).strip()] = val_str.replace("'", "''")
+                clean_props[str(k).strip()] = val_str
 
     # Prefer PRODUCT_DEFINITION_SHAPE (the AP214-correct attach point for
     # shape/material properties); fall back progressively for files that
@@ -497,10 +503,17 @@ def apply_material_metadata(step_text, material_name, properties=None):
     def _emit_property(key, value, target_ent):
         nonlocal cur_id
         safe_key = re.sub(r'[^a-zA-Z0-9_]', '_', key).lower() or "property"
+        # safe_label: the human-readable key as it appears inside STEP string
+        # literals below — needs the same quote-escaping as safe_val (values
+        # already get this). In today's usage `key` is always a fixed CSV
+        # column name, never user input, so this is defense-in-depth rather
+        # than a live exploit — but a generated CAD file should never depend
+        # on that staying true.
+        safe_label = str(key).replace("'", "''")
         safe_val = str(value).replace("'", "''")
-        entities.append(f"#{cur_id}=PROPERTY_DEFINITION('{safe_key}','{key}',#{target_ent});")
-        entities.append(f"#{cur_id + 1}=DESCRIPTIVE_REPRESENTATION_ITEM('{key}','{safe_val}');")
-        entities.append(f"#{cur_id + 2}=REPRESENTATION('{key} representation',(#{cur_id + 1}),#{ctx_id});")
+        entities.append(f"#{cur_id}=PROPERTY_DEFINITION('{safe_key}','{safe_label}',#{target_ent});")
+        entities.append(f"#{cur_id + 1}=DESCRIPTIVE_REPRESENTATION_ITEM('{safe_label}','{safe_val}');")
+        entities.append(f"#{cur_id + 2}=REPRESENTATION('{safe_label} representation',(#{cur_id + 1}),#{ctx_id});")
         entities.append(f"#{cur_id + 3}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id},#{cur_id + 2});")
         cur_id += 4
 
@@ -645,7 +658,12 @@ def generate_step_file(material_name, properties=None, extra_metadata=None, dime
     # 2. Material property entities for SpaceClaim / ANSYS / SolidWorks / FreeCAD.
     # Delegates to the generic injector so generated specimens and
     # user-uploaded STEP files share one correctness-tested code path.
-    return apply_material_metadata(base_step, sanitized_name, clean_props)
+    # Passes the *raw* properties, not clean_props (already STEP-escaped
+    # above for embedding into header_desc) — apply_material_metadata does
+    # its own cleaning/escaping internally, and feeding it pre-escaped
+    # values double-escapes every apostrophe (confirmed: a single `'` in a
+    # property value came out as 8 quote characters before this fix).
+    return apply_material_metadata(base_step, sanitized_name, properties)
 
 
 

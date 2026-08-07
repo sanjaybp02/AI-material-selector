@@ -80,13 +80,52 @@ div[data-testid="stVerticalBlockBorderWrapper"] {{
     background: var(--surface) !important;
     border-radius: var(--radius) !important;
     border: 1px solid var(--border) !important;
-    box-shadow: none !important;
-    transition: border-color 0.2s ease !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease !important;
 }}
 
+div[data-testid="stVerticalBlockBorderWrapper"]:hover {{
+    border-color: var(--border-hover) !important;
+}}
+/* Lift is scoped to the smaller card-like elements (metrics, expanders) —
+   not the large Step 1/2/3 containers, where a hover-shift would feel
+   twitchy since the mouse sits over them constantly while typing. */
 div[data-testid="stExpander"]:hover,
 div[data-testid="stMetric"]:hover {{
     border-color: var(--border-hover) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+    transform: translateY(-2px) !important;
+}}
+
+/* stMetric value: monospace for an instrument-panel feel on numeric readouts */
+div[data-testid="stMetricValue"] {{
+    font-family: 'JetBrains Mono', monospace !important;
+}}
+div[data-testid="stMetric"] {{
+    border-top: 2px solid var(--accent) !important;
+}}
+
+/* ── Custom scrollbar ── */
+::-webkit-scrollbar {{
+    width: 10px;
+    height: 10px;
+}}
+::-webkit-scrollbar-track {{
+    background: var(--surface-inset);
+}}
+::-webkit-scrollbar-thumb {{
+    background: var(--border-hover);
+    border-radius: 5px;
+    border: 2px solid var(--surface-inset);
+}}
+::-webkit-scrollbar-thumb:hover {{
+    background: var(--accent);
+}}
+
+/* ── Text selection ── */
+::selection {{
+    background: var(--accent-dim);
+    color: var(--text-heading);
 }}
 
 /* ── Buttons ── */
@@ -98,7 +137,7 @@ button[kind="primary"] {{
     font-family: 'Inter', sans-serif !important;
     font-weight: 500 !important;
     padding: 0.5rem 1rem !important;
-    transition: background 0.2s ease !important;
+    transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease !important;
     box-shadow: none !important;
     text-transform: none !important;
     letter-spacing: normal !important;
@@ -106,8 +145,12 @@ button[kind="primary"] {{
 button[kind="primary"]:hover:not(:disabled) {{
     background: var(--accent-strong-hover) !important;
     border-color: var(--accent) !important;
-    box-shadow: none !important;
-    transform: none !important;
+    box-shadow: 0 4px 12px rgba(56, 139, 253, 0.35) !important;
+    transform: translateY(-1px) !important;
+}}
+button[kind="primary"]:active:not(:disabled) {{
+    transform: translateY(0) !important;
+    box-shadow: 0 1px 4px rgba(56, 139, 253, 0.3) !important;
 }}
 button[kind="primary"]:disabled {{
     opacity: 0.5 !important;
@@ -153,12 +196,29 @@ section[data-testid="stSidebar"] .stMarkdown h3 {{
 
 /* ── Inputs ── */
 div[data-testid="stTextArea"] textarea,
-div[data-testid="stTextInput"] input {{
+div[data-testid="stTextInput"] input,
+div[data-testid="stNumberInput"] input {{
     border-radius: var(--radius) !important;
     font-size: 0.9rem !important;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease !important;
+}}
+div[data-testid="stTextArea"] textarea:focus,
+div[data-testid="stTextInput"] input:focus,
+div[data-testid="stNumberInput"] input:focus {{
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px var(--accent-dim) !important;
 }}
 div[data-testid="stRadio"] label {{
     font-size: 0.875rem !important;
+}}
+
+/* Numeric readouts (slider value labels, number inputs) get the mono
+   font for an instrument-panel feel consistent with stMetric values. */
+div[data-testid="stSlider"] [data-testid="stTickBarMin"],
+div[data-testid="stSlider"] [data-testid="stTickBarMax"],
+div[data-testid="stSlider"] div[data-baseweb="slider"] div[role="slider"],
+div[data-testid="stNumberInput"] input {{
+    font-family: 'JetBrains Mono', monospace !important;
 }}
 
 /* ── Chat ── */
@@ -167,7 +227,32 @@ div[data-testid="stChatMessage"] {{
     border: 1px solid var(--surface-inset) !important;
 }}
 
+/* ── Dividers: a soft accent-tinted fade instead of a flat grey rule ── */
+div[data-testid="stMarkdownContainer"] hr,
+hr {{
+    border: none !important;
+    height: 1px !important;
+    background: linear-gradient(90deg, transparent, var(--border-hover) 50%, transparent) !important;
+    margin: 1.5rem 0 !important;
+}}
+
 /* ── Custom components ── */
+.hero-wrap {{
+    position: relative;
+    margin-bottom: 24px;
+    padding: 4px 0;
+}}
+.hero-wrap::before {{
+    content: "";
+    position: absolute;
+    top: -40px;
+    left: -60px;
+    width: 340px;
+    height: 220px;
+    background: radial-gradient(circle, rgba(88, 166, 255, 0.14) 0%, rgba(88, 166, 255, 0) 70%);
+    pointer-events: none;
+    z-index: -1;
+}}
 .hero-title {{
     margin: 0;
     font-size: 2rem;
@@ -342,7 +427,11 @@ div[data-testid="stChatMessage"] {{
     border-color: var(--accent);
     color: var(--accent);
     background: var(--accent-dim);
-    box-shadow: 0 0 0 4px var(--accent-dim);
+    animation: stepper-pulse 2.4s ease-in-out infinite;
+}}
+@keyframes stepper-pulse {{
+    0%, 100% {{ box-shadow: 0 0 0 4px var(--accent-dim); }}
+    50% {{ box-shadow: 0 0 0 7px rgba(56, 139, 253, 0.18); }}
 }}
 .stepper-circle.done {{
     border-color: var(--success);
@@ -450,7 +539,7 @@ button:has(div[class*="spinner"]) div {{
 def render_hero(mode_label: str):
     st.markdown(
         f"""
-<div style="margin-bottom: 24px;">
+<div class="hero-wrap">
     <p class="section-label">Engineering Material Intelligence</p>
     <h1 class="hero-title">
         Material Selector

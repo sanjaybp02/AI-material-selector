@@ -566,6 +566,19 @@ with st.sidebar:
     else:
         unit_system = settings.get("unit_system", "Metric")
 
+    # Industry constraint packs (filters.py) store curated preset values
+    # (e.g. Aerospace: min yield 300 MPa in Metric, 43500 psi in Imperial)
+    # in session_state without tracking which unit system they were set
+    # under. Switching units afterward would otherwise leave a Metric
+    # number being read as an Imperial one (or vice versa) — filters.py
+    # now clamps slider defaults so this can't silently corrupt a
+    # slider's range, but the stale value would still be nonsense, so
+    # clear the pack presets outright on any unit switch instead.
+    if st.session_state.get("last_unit_system") != unit_system:
+        for k in ["pack_min_temp", "pack_min_yield", "pack_max_density", "pack_max_carbon", "pack_bio_compatible"]:
+            st.session_state.pop(k, None)
+        st.session_state["last_unit_system"] = unit_system
+
     render_sidebar_status(bool(api_key), len(df_raw))
 
 df_display = convert_units(df_raw, unit_system)

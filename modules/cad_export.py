@@ -422,14 +422,143 @@ END-ISO-10303-21;
 """
 
 
-def generate_step_file(material_name, properties=None, extra_metadata=None):
+def _find_entity_ids(step_text, entity_type):
+    """Return the ids (as strings, in file order) of every top-level entity
+    of the given STEP keyword, e.g. entity_type='PRODUCT_DEFINITION_SHAPE'."""
+    pattern = re.compile(r"#(\d+)\s*=\s*" + entity_type + r"\s*\(")
+    return pattern.findall(step_text)
+
+
+def _next_entity_id(step_text):
+    """Lowest unused entity id, computed from every '#N =' assignment in the
+    file (not mere references), so injected entities can never collide with
+    ids already used by an arbitrary uploaded STEP file."""
+    ids = [int(m) for m in re.findall(r"#(\d+)\s*=", step_text)]
+    return (max(ids) + 1) if ids else 1
+
+
+def apply_material_metadata(step_text, material_name, properties=None):
     """
-    Generate an ISO 10303 STEP AP214 file containing an Open CASCADE validated
-    3D solid specimen cube (20x20x20mm) with embedded material property metadata.
+    Format-agnostic material-property injector for any valid ISO-10303-21
+    STEP file. Locates PRODUCT-level entities dynamically by scanning the
+    file's own entity ids, rather than assuming a fixed layout — so it
+    works equally on our own generated specimens and on arbitrary
+    user-uploaded STEP AP203/AP214/AP242 files. Appends PROPERTY_DEFINITION
+    and MATERIAL_DESIGNATION entities readable by SolidWorks, FreeCAD,
+    SpaceClaim, and ANSYS.
+
+    Raises ValueError if the file has no recognizable product/shape entity
+    to attach properties to (i.e. it isn't a real CAD part export).
+    """
+    sanitized_name = str(material_name).replace("'", "").replace('"', "")
+
+    clean_props = {}
+    if isinstance(properties, dict):
+        for k, v in properties.items():
+            if pd.notna(v) and v is not None and v != "":
+                if isinstance(v, float):
+                    val_str = f"{v:.4g}" if abs(v) < 10000 else f"{v:.2f}"
+                else:
+                    val_str = str(v)
+                clean_props[str(k).strip()] = val_str.replace("'", "''")
+
+    # Prefer PRODUCT_DEFINITION_SHAPE (the AP214-correct attach point for
+    # shape/material properties); fall back progressively for files that
+    # only expose the looser entity types.
+    targets = _find_entity_ids(step_text, "PRODUCT_DEFINITION_SHAPE")
+    if not targets:
+        targets = _find_entity_ids(step_text, "PRODUCT_DEFINITION")
+    if not targets:
+        targets = _find_entity_ids(step_text, "PRODUCT")
+    if not targets:
+        raise ValueError(
+            "No PRODUCT, PRODUCT_DEFINITION, or PRODUCT_DEFINITION_SHAPE "
+            "entity was found in this STEP file, so material properties "
+            "can't be attached to it. It may not be a valid CAD part export."
+        )
+    targets = list(dict.fromkeys(targets))  # de-dupe, preserve order
+
+    cur_id = _next_entity_id(step_text)
+    entities = []
+
+    # Self-contained representation context: injected properties never
+    # depend on parsing or guessing the host file's own context entity.
+    ctx_id, len_id, ang_id, sang_id = cur_id, cur_id + 1, cur_id + 2, cur_id + 3
+    entities.append(
+        f"#{ctx_id} = ( GEOMETRIC_REPRESENTATION_CONTEXT(3) "
+        f"GLOBAL_UNIT_ASSIGNED_CONTEXT((#{len_id},#{ang_id},#{sang_id})) "
+        f"REPRESENTATION_CONTEXT('AI Material Selector Context','3D') );"
+    )
+    entities.append(f"#{len_id} = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) );")
+    entities.append(f"#{ang_id} = ( NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.) );")
+    entities.append(f"#{sang_id} = ( NAMED_UNIT(*) SI_UNIT($,.STERADIAN.) SOLID_ANGLE_UNIT() );")
+    cur_id += 4
+
+    def _emit_property(key, value, target_ent):
+        nonlocal cur_id
+        safe_key = re.sub(r'[^a-zA-Z0-9_]', '_', key).lower() or "property"
+        safe_val = str(value).replace("'", "''")
+        entities.append(f"#{cur_id}=PROPERTY_DEFINITION('{safe_key}','{key}',#{target_ent});")
+        entities.append(f"#{cur_id + 1}=DESCRIPTIVE_REPRESENTATION_ITEM('{key}','{safe_val}');")
+        entities.append(f"#{cur_id + 2}=REPRESENTATION('{key} representation',(#{cur_id + 1}),#{ctx_id});")
+        entities.append(f"#{cur_id + 3}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id},#{cur_id + 2});")
+        cur_id += 4
+
+    for target_ent in targets:
+        entities.append(f"#{cur_id}=MATERIAL_DESIGNATION('{sanitized_name}',#{target_ent});")
+        cur_id += 1
+        _emit_property("Material Name", sanitized_name, target_ent)
+        _emit_property("Material", sanitized_name, target_ent)
+        for prop_key, prop_val in clean_props.items():
+            if prop_key == "Material Name":
+                continue
+            _emit_property(prop_key, prop_val, target_ent)
+
+    mat_str = "\n".join(entities)
+    endsec_idx = step_text.rfind("ENDSEC;")
+    if endsec_idx == -1:
+        return step_text + "\n" + mat_str
+    return step_text[:endsec_idx] + mat_str + "\nENDSEC;" + step_text[endsec_idx + len("ENDSEC;"):].lstrip()
+
+
+_TEMPLATE_SCALE_TOKEN = re.compile(r'(?<![\d.])(-?)(10|20)\.(?!\d)')
+
+
+def _scale_cube_template(template_text, edge_mm):
+    """Uniformly rescale the validated 20mm-cube template to any edge length.
+    Safe because every '10.'/'20.' literal in the template is a coordinate or
+    parametric-range value derived from the 20mm edge (verified: none are
+    embedded in larger numbers) — a uniform scale keeps the topology valid."""
+    scale = float(edge_mm) / 20.0
+
+    def repl(m):
+        val = float(m.group(1) + m.group(2)) * scale
+        text = f"{val:g}"
+        # STEP REAL literals require a decimal point (e.g. "10." not "10");
+        # only append one if :g didn't already produce one (non-integer
+        # scale factors, e.g. 37.5, would otherwise get a second "." tacked
+        # on — "37.5." is not a valid REAL literal).
+        return text if "." in text else text + "."
+
+    return _TEMPLATE_SCALE_TOKEN.sub(repl, template_text)
+
+
+def generate_step_file(material_name, properties=None, extra_metadata=None, dimensions=(20.0, 20.0, 20.0)):
+    """
+    Generate an ISO 10303 STEP AP214 file containing a 3D solid specimen with
+    embedded material property metadata.
+
+    dimensions=(length, width, height) in mm. When cadquery is available,
+    any box dimensions are supported (real geometry kernel). Without it, the
+    dependency-free fallback only supports a uniform cube (length==width==
+    height) via a validated, rescaled template — a ValueError is raised for
+    non-uniform dimensions in that case so the caller can surface a clear
+    message rather than silently returning wrong geometry.
     """
     sanitized_id = re.sub(r'[^a-zA-Z0-9]', '_', str(material_name))
     sanitized_name = str(material_name).replace("'", "").replace('"', "")
     timestamp = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    length, width, height = (float(d) for d in dimensions)
 
     if properties is None:
         try:
@@ -455,12 +584,16 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
     prop_summary_parts = [f"{k}={v}" for k, v in clean_props.items() if k != "Material Name"]
     header_prop_str = "; ".join(prop_summary_parts) if prop_summary_parts else "Default properties"
     header_desc = f"Material Properties: {header_prop_str}"
+    if abs(length - width) < 1e-6 and abs(length - height) < 1e-6:
+        size_desc = f"Standard {length:g}mm Specimen Cube"
+    else:
+        size_desc = f"Specimen Block {length:g}x{width:g}x{height:g}mm"
 
     base_step = None
     try:
         import cadquery as cq
         import tempfile
-        box = cq.Workplane("XY").box(20.0, 20.0, 20.0)
+        box = cq.Workplane("XY").box(length, width, height)
         with tempfile.NamedTemporaryFile(suffix=".stp", delete=False) as tmp:
             tmp_path = tmp.name
         cq.exporters.export(box, tmp_path, exportType="STEP")
@@ -472,16 +605,27 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
         base_step = None
 
     if not base_step:
-        base_step = OCCT_SOLID_TEMPLATE.format(
+        if abs(length - width) > 1e-6 or abs(length - height) > 1e-6:
+            raise ValueError(
+                "Non-uniform box dimensions (length, width, and height not all "
+                "equal) need the optional cadquery geometry engine, which isn't "
+                "available in this environment. Use equal length/width/height "
+                "for a cube specimen."
+            )
+        template = OCCT_SOLID_TEMPLATE.format(
             sanitized_name=sanitized_name,
             sanitized_id=sanitized_id,
             header_desc=header_desc,
             timestamp=timestamp,
         )
+        base_step = _scale_cube_template(template, length)
 
+    # Non-greedy .*? (not [^)]*) because header_desc routinely contains its own
+    # parentheses (e.g. "Density (g/cm³)=..."), which would otherwise truncate
+    # the match early and silently leave the placeholder text unreplaced.
     base_step = re.sub(
-        r"FILE_DESCRIPTION\(\([^)]*\),'2;1'\);",
-        f"FILE_DESCRIPTION(('Material Specimen: {sanitized_name}','{header_desc}','Standard 20mm Specimen Cube'),'2;1');",
+        r"FILE_DESCRIPTION\(\(.*?\),'2;1'\);",
+        lambda _m: f"FILE_DESCRIPTION(('Material Specimen: {sanitized_name}','{header_desc}','{size_desc}'),'2;1');",
         base_step
     )
     base_step = re.sub(
@@ -498,66 +642,10 @@ def generate_step_file(material_name, properties=None, extra_metadata=None):
     base_step = re.sub(r"MANIFOLD_SOLID_BREP\('([^']*)',#16\);", f"MANIFOLD_SOLID_BREP('{sanitized_name}',#16);", base_step)
     base_step = re.sub(r"ADVANCED_BREP_SHAPE_REPRESENTATION\('([^']*)',\(#11,#15\),#345\);", f"ADVANCED_BREP_SHAPE_REPRESENTATION('{sanitized_name}_Shape',(#11,#15),#345);", base_step)
 
-    # 2. Comprehensive Material Entities for SpaceClaim / ANSYS / SolidWorks / FreeCAD
-    mat_entities = []
-    start_id = 500
-
-    # Primary Material Designations across all topology nodes
-    mat_entities.append(f"#{start_id}=MATERIAL_DESIGNATION('{sanitized_name}',#4);")
-    mat_entities.append(f"#{start_id+1}=MATERIAL_DESIGNATION('{sanitized_name}',#5);")
-    mat_entities.append(f"#{start_id+2}=MATERIAL_DESIGNATION('{sanitized_name}',#7);")
-    mat_entities.append(f"#{start_id+3}=MATERIAL_DESIGNATION('{sanitized_name}',#15);")
-    mat_entities.append(f"#{start_id+4}=MATERIAL_DESIGNATION_WITH_LOCATION('{sanitized_name}',#4,#5);")
-
-    targets = [("#4", "pds"), ("#5", "pd"), ("#7", "prod"), ("#15", "solid")]
-    cur_id = start_id + 10
-
-    # Material Name Property Definitions (Exact SpaceClaim keys: 'Material Name', 'Material', 'material_name')
-    for target_ent, label in targets:
-        mat_entities.append(f"#{cur_id}=PROPERTY_DEFINITION('Material Name','Material Name',{target_ent});")
-        mat_entities.append(f"#{cur_id+1}=DESCRIPTIVE_REPRESENTATION_ITEM('Material Name','{sanitized_name}');")
-        mat_entities.append(f"#{cur_id+2}=REPRESENTATION('Material Name representation',(#{cur_id+1}),#345);")
-        mat_entities.append(f"#{cur_id+3}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id},#{cur_id+2});")
-        cur_id += 5
-
-        mat_entities.append(f"#{cur_id}=PROPERTY_DEFINITION('Material','Material',{target_ent});")
-        mat_entities.append(f"#{cur_id+1}=DESCRIPTIVE_REPRESENTATION_ITEM('Material','{sanitized_name}');")
-        mat_entities.append(f"#{cur_id+2}=REPRESENTATION('Material representation',(#{cur_id+1}),#345);")
-        mat_entities.append(f"#{cur_id+3}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id},#{cur_id+2});")
-        cur_id += 5
-
-    density_val_str = clean_props.get("Density (g/cm³)", clean_props.get("Density", ""))
-    if density_val_str:
-        for target_ent, label in targets:
-            mat_entities.append(f"#{cur_id}=PROPERTY_DEFINITION('Density','Density',{target_ent});")
-            mat_entities.append(f"#{cur_id+1}=DESCRIPTIVE_REPRESENTATION_ITEM('Density','{density_val_str} g/cm3');")
-            mat_entities.append(f"#{cur_id+2}=REPRESENTATION('Density representation',(#{cur_id+1}),#345);")
-            mat_entities.append(f"#{cur_id+3}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id},#{cur_id+2});")
-            cur_id += 5
-
-            mat_entities.append(f"#{cur_id}=PROPERTY_DEFINITION('density','density',{target_ent});")
-            mat_entities.append(f"#{cur_id+1}=DESCRIPTIVE_REPRESENTATION_ITEM('density','{density_val_str}');")
-            mat_entities.append(f"#{cur_id+2}=REPRESENTATION('density representation',(#{cur_id+1}),#345);")
-            mat_entities.append(f"#{cur_id+3}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id},#{cur_id+2});")
-            cur_id += 5
-
-    for prop_key, prop_val in clean_props.items():
-        if prop_key in ["Material Name", "Density (g/cm³)", "Density"]:
-            continue
-        safe_key = re.sub(r'[^a-zA-Z0-9_]', '_', prop_key).lower()
-        safe_val = str(prop_val).replace("'", "''")
-        for target_ent, label in targets:
-            mat_entities.append(f"#{cur_id}=PROPERTY_DEFINITION('{safe_key}','{prop_key}',{target_ent});")
-            mat_entities.append(f"#{cur_id+1}=DESCRIPTIVE_REPRESENTATION_ITEM('{safe_key}','{safe_val}');")
-            mat_entities.append(f"#{cur_id+2}=REPRESENTATION('{safe_key} representation',(#{cur_id+1}),#345);")
-            mat_entities.append(f"#{cur_id+3}=PROPERTY_DEFINITION_REPRESENTATION(#{cur_id},#{cur_id+2});")
-            cur_id += 5
-
-    mat_str = "\n".join(mat_entities)
-    endsec_idx = base_step.rfind("ENDSEC;")
-    if endsec_idx != -1:
-        return base_step[:endsec_idx] + mat_str + "\nENDSEC;" + base_step[endsec_idx + len("ENDSEC;"):].lstrip()
-    return base_step + "\n" + mat_str
+    # 2. Material property entities for SpaceClaim / ANSYS / SolidWorks / FreeCAD.
+    # Delegates to the generic injector so generated specimens and
+    # user-uploaded STEP files share one correctness-tested code path.
+    return apply_material_metadata(base_step, sanitized_name, clean_props)
 
 
 

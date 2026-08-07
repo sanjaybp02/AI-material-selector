@@ -1,5 +1,7 @@
 """Shared UI theme, CSS, and reusable Streamlit presentation helpers."""
 
+import base64
+
 import streamlit as st
 
 # ── Design tokens (SaaS theme) ─────────────────────────────────────────
@@ -631,4 +633,84 @@ def inject_clarity():
     </script>
     """
     st.components.v1.html(js_code, height=0, width=0)
+
+
+def render_stl_viewer(stl_bytes: bytes, height: int = 420):
+    """Embed a lightweight three.js viewer (rotate/zoom via mouse) for a CAD
+    Studio preview mesh, so users can inspect a specimen before downloading
+    it rather than trusting a blind export. Self-contained per render call —
+    three.js is loaded from CDN, standard for a server-rendered Streamlit
+    component (unlike a published Artifact, this iframe has normal network
+    access)."""
+    b64 = base64.b64encode(stl_bytes).decode("ascii")
+    html = f"""
+    <div id="stl-viewer-root" style="width:100%;height:{height}px;border-radius:12px;
+        overflow:hidden;background:{SURFACE};border:1px solid {ACCENT_BORDER};"></div>
+    <div id="stl-viewer-hint" style="color:{TEXT_MUTED};font-size:12px;margin-top:6px;
+        font-family:Inter,sans-serif;">Drag to rotate · scroll to zoom</div>
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+    (function() {{
+        var root = document.getElementById('stl-viewer-root');
+        var height = {height};
+        var width = root.clientWidth || 600;
+
+        var scene = new THREE.Scene();
+        scene.background = new THREE.Color('{SURFACE}');
+
+        var camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100000);
+        var renderer = new THREE.WebGLRenderer({{ antialias: true }});
+        renderer.setSize(width, height);
+        root.appendChild(renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+        var dl1 = new THREE.DirectionalLight(0xffffff, 0.75);
+        dl1.position.set(1, 1, 1);
+        scene.add(dl1);
+        var dl2 = new THREE.DirectionalLight(0xffffff, 0.35);
+        dl2.position.set(-1, -1, -0.5);
+        scene.add(dl2);
+
+        var raw = atob("{b64}");
+        var buf = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+
+        var geometry = new THREE.STLLoader().parse(buf.buffer);
+        geometry.center();
+        geometry.computeBoundingSphere();
+
+        var material = new THREE.MeshStandardMaterial({{
+            color: 0x4fd1c5, metalness: 0.2, roughness: 0.6, side: THREE.DoubleSide,
+        }});
+        var mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        var radius = (geometry.boundingSphere && geometry.boundingSphere.radius) || 20;
+        camera.position.set(radius * 2.2, radius * 1.6, radius * 2.2);
+        camera.lookAt(0, 0, 0);
+
+        var controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0, 0);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.update();
+
+        (function animate() {{
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }})();
+
+        window.addEventListener('resize', function() {{
+            var w = root.clientWidth || width;
+            camera.aspect = w / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, height);
+        }});
+    }})();
+    </script>
+    """
+    st.components.v1.html(html, height=height + 30, scrolling=False)
 

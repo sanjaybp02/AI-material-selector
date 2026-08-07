@@ -18,14 +18,17 @@ from modules.cost_engine import fetch_live_metal_price, calculate_part_cost
 from modules.ai_engine import get_single_recommendation, get_top3_recommendations, chat_followup, explain_filter_failure
 from modules.charts import radar_chart, scatter_plot, property_heatmap
 from modules.pdf_report import create_pdf
-from modules.cad_export import generate_step_file
+from modules.cad_engine import (
+    generate_specimen, apply_properties_to_upload, export_bytes as cad_export_bytes,
+    cadquery_available, CadEngineError,
+)
 from modules.history import init_history, log_search, render_history_table
 from modules.templates import load_templates, save_custom_template, delete_custom_template
 from modules.ui import (
     inject_theme, render_hero, section_header, render_status_banner,
     render_empty_state, render_confidence_bar, render_pros_cons,
     render_sidebar_status, render_footer, render_tour_banner,
-    inject_clarity,
+    inject_clarity, render_stl_viewer,
 )
 
 SETTINGS_FILE = "settings.json"
@@ -194,24 +197,136 @@ def render_lite_results(r, currency, unit_system):
             use_container_width=True,
         )
     with c_btn2:
-        step_str = generate_step_file(r["exact_name"], r.get("properties"))
-        st.download_button(
-            "Export CAD (STEP)",
-            data=step_str.encode("utf-8"),
-            file_name=f"{r['exact_name'].replace(' ', '_')}_specimen.stp",
-            mime="application/step",
-            key="step_single",
-            use_container_width=True,
-        )
+        try:
+            cad_result = generate_specimen("cube", (20, 20, 20), r["exact_name"], r.get("properties"))
+            st.download_button(
+                "Export CAD (STEP)",
+                data=cad_export_bytes(cad_result, "step"),
+                file_name=f"{r['exact_name'].replace(' ', '_')}_specimen.stp",
+                mime="application/step",
+                key="step_single",
+                use_container_width=True,
+            )
+        except CadEngineError as e:
+            st.error(f"CAD export failed: {e}")
     with c_btn3:
         if st.button("View Datasheet", use_container_width=True):
             render_datasheet(r.get("properties", {}))
 
 
+def render_cad_studio(df_display, rec_names):
+    """Generate a parametric specimen or upload your own STEP model, apply a
+    material's properties to it through the same server-side engine either
+    way, preview it in 3D, and export."""
+    st.caption(
+        "Generate a parametric specimen or upload your own STEP model, apply "
+        "a material's properties to it, and preview before exporting."
+    )
+
+    material_options = df_display["Material Name"].tolist() if not df_display.empty else []
+    if not material_options:
+        render_empty_state("", "No materials loaded", "Run an analysis first to populate the material list.")
+        return
+
+    default_idx = material_options.index(rec_names[0]) if rec_names and rec_names[0] in material_options else 0
+    material_name = st.selectbox(
+        "Material to apply", options=material_options, index=default_idx, key="cad_studio_material",
+    )
+    if st.session_state.get("cad_studio_last_material") != material_name:
+        st.session_state.pop("cad_studio_result", None)
+        st.session_state["cad_studio_last_material"] = material_name
+
+    material_props = {}
+    match = df_display[df_display["Material Name"] == material_name]
+    if not match.empty:
+        material_props = match.iloc[0].to_dict()
+
+    source_mode = st.radio(
+        "Source", ["Generate specimen", "Upload your model"], horizontal=True, key="cad_studio_source",
+    )
+
+    if source_mode == "Generate specimen":
+        cq_ok = cadquery_available()
+        shape_choice = st.radio(
+            "Specimen shape",
+            ["Cube (equal sides)", "Box (custom L×W×H)" + ("" if cq_ok else " — needs optional engine")],
+            horizontal=True, key="cad_studio_shape",
+        )
+        if shape_choice.startswith("Cube"):
+            edge = st.slider("Edge length (mm)", min_value=1, max_value=500, value=20, key="cad_studio_edge")
+            dims, shape_key = (edge, edge, edge), "cube"
+        else:
+            d1, d2, d3 = st.columns(3)
+            length = d1.number_input("Length (mm)", min_value=1.0, max_value=500.0, value=20.0, key="cad_studio_l")
+            width = d2.number_input("Width (mm)", min_value=1.0, max_value=500.0, value=20.0, key="cad_studio_w")
+            height = d3.number_input("Height (mm)", min_value=1.0, max_value=500.0, value=20.0, key="cad_studio_h")
+            dims, shape_key = (length, width, height), "box"
+            if not cq_ok:
+                st.info(
+                    "Custom L×W×H needs the optional cadquery geometry engine, which "
+                    "isn't installed in this environment. Generating will fail unless "
+                    "length = width = height (that still works as a cube)."
+                )
+
+        if st.button("Generate specimen", type="primary", key="cad_studio_generate"):
+            try:
+                with st.spinner("Generating specimen..."):
+                    st.session_state["cad_studio_result"] = generate_specimen(
+                        shape_key, dims, material_name, material_props
+                    )
+            except CadEngineError as e:
+                st.error(str(e))
+                st.session_state.pop("cad_studio_result", None)
+
+    else:
+        uploaded = st.file_uploader(
+            "Upload a STEP file (.stp / .step)", type=["stp", "step"], key="cad_studio_upload",
+            help="Material properties are embedded directly into the file's CAD metadata "
+                 "— readable in SolidWorks, FreeCAD, ANSYS, and SpaceClaim.",
+        )
+        if uploaded is not None and st.button("Apply material properties", type="primary", key="cad_studio_apply"):
+            try:
+                with st.spinner("Applying material properties..."):
+                    st.session_state["cad_studio_result"] = apply_properties_to_upload(
+                        uploaded.getvalue(), uploaded.name, material_name, material_props
+                    )
+            except CadEngineError as e:
+                st.error(str(e))
+                st.session_state.pop("cad_studio_result", None)
+
+    result = st.session_state.get("cad_studio_result")
+    if result:
+        st.markdown("##### Preview & export")
+        if result.preview_available and result.stl_bytes:
+            render_stl_viewer(result.stl_bytes)
+        else:
+            st.info(result.preview_note or "Preview isn't available for this model.")
+
+        exp1, exp2 = st.columns(2)
+        with exp1:
+            try:
+                st.download_button(
+                    "Download STEP", data=cad_export_bytes(result, "step"),
+                    file_name=f"{result.filename_stub}.stp", mime="application/step",
+                    use_container_width=True, key="cad_studio_dl_step",
+                )
+            except CadEngineError as e:
+                st.error(str(e))
+        with exp2:
+            if result.stl_bytes:
+                st.download_button(
+                    "Download STL (preview mesh)", data=cad_export_bytes(result, "stl"),
+                    file_name=f"{result.filename_stub}.stl", mime="model/stl",
+                    use_container_width=True, key="cad_studio_dl_stl",
+                )
+            else:
+                st.caption("STL export needs the optional cadquery engine for uploaded models.")
+
+
 def render_advanced_results(processed, rec_names, df_display, unit_system, api_key, model_name):
     currency = get_currency_symbol(unit_system)
-    tab_results, tab_charts, tab_compare, tab_history = st.tabs(
-        ["Results", "Charts", "Compare", "History"]
+    tab_results, tab_charts, tab_compare, tab_cad, tab_history = st.tabs(
+        ["Results", "Charts", "Compare", "CAD Studio", "History"]
     )
 
     with tab_results:
@@ -278,13 +393,16 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
                         use_container_width=True,
                     )
                 with c_btn2:
-                    step_str = generate_step_file(item["exact_name"], item.get("properties"))
-                    st.download_button(
-                        f"CAD (STEP)", data=step_str.encode("utf-8"),
-                        file_name=f"{item['exact_name'].replace(' ', '_')}_specimen.stp",
-                        mime="application/step", key=f"step_{rank}",
-                        use_container_width=True,
-                    )
+                    try:
+                        cad_result = generate_specimen("cube", (20, 20, 20), item["exact_name"], item.get("properties"))
+                        st.download_button(
+                            f"CAD (STEP)", data=cad_export_bytes(cad_result, "step"),
+                            file_name=f"{item['exact_name'].replace(' ', '_')}_specimen.stp",
+                            mime="application/step", key=f"step_{rank}",
+                            use_container_width=True,
+                        )
+                    except CadEngineError as e:
+                        st.error(f"CAD export failed: {e}")
                 with c_btn3:
                     if st.button(f"Datasheet", key=f"ds_{rank}", use_container_width=True):
                         render_datasheet(item.get("properties", {}))
@@ -350,6 +468,10 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
             st.info("Select at least two materials to compare.")
         else:
             render_empty_state("", "Pick materials", "Choose two or more from the list above.")
+
+    with tab_cad:
+        chart_df = st.session_state.get("last_edited_df", df_display)
+        render_cad_studio(chart_df, rec_names)
 
     with tab_history:
         render_history_table()

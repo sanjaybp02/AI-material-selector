@@ -28,7 +28,7 @@ from modules.ui import (
     inject_theme, render_hero, section_header, render_status_banner,
     render_empty_state, render_confidence_bar, render_pros_cons,
     render_sidebar_status, render_footer, render_tour_banner,
-    inject_clarity, render_stl_viewer, render_stepper, scroll_to_anchor,
+    inject_clarity, render_stl_viewer, render_stepper, scroll_to_anchor, mark_step_cards,
 )
 
 SETTINGS_FILE = "settings.json"
@@ -873,4 +873,5 @@ with st.container(border=True):
             "Complete Step 1, then click Find materials to get AI-powered recommendations.",
         )
 
+mark_step_cards()
 render_footer()

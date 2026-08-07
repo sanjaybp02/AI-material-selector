@@ -10,6 +10,7 @@ settings.json
 
 # Local databases
 history.db
+templates.json
 
 # Runtime logs
 *.log

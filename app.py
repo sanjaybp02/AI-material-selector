@@ -25,7 +25,7 @@ from modules.ui import (
     inject_theme, render_hero, section_header, render_status_banner,
     render_empty_state, render_confidence_bar, render_pros_cons,
     render_sidebar_status, render_footer, render_tour_banner,
-    inject_clarity,
+    inject_clarity, render_stepper, scroll_to_anchor,
 )
 
 SETTINGS_FILE = "settings.json"
@@ -447,6 +447,19 @@ render_hero("Lite" if not is_advanced else "Advanced")
 
 st.caption("ENGINEERING INTELLIGENCE DASHBOARD")
 
+# Results readiness is checked here (early, from session_state only — no
+# widget values needed yet) so the step tracker can reflect it above the
+# form, and reused verbatim below instead of recomputed.
+has_lite = not is_advanced and "lite_result" in st.session_state
+has_advanced = is_advanced and bool(st.session_state.get("advanced_results"))
+results_ready = has_lite or has_advanced
+
+stepper_labels = ["Requirements"] + (["Constraints"] if is_advanced else []) + ["Results"]
+if results_ready:
+    render_stepper(stepper_labels, current=len(stepper_labels) - 1, done=set(range(len(stepper_labels))))
+else:
+    render_stepper(stepper_labels, current=0, done=set())
+
 # Step 1 — Requirements
 with st.container(border=True):
     st.markdown('<div id="tour-step-1-anchor"></div>', unsafe_allow_html=True)
@@ -553,7 +566,13 @@ elif filtered_df.empty:
                 st.error(f"Could not explain failure: {e}")
     can_search = False
 
-if st.button("Find materials", type="primary", disabled=not can_search, use_container_width=True):
+st.write("")
+find_clicked = st.button("Find materials", type="primary", disabled=not can_search, use_container_width=True)
+if can_search:
+    st.caption(f"Uses your Gemini API key · {model_name} · usually ready in 5-15 seconds")
+st.write("")
+
+if find_clicked:
     st.session_state["last_edited_df"] = filtered_df
     cost_instruction = ""
     if cost_source == "Use AI Market Estimation":
@@ -588,6 +607,8 @@ if st.button("Find materials", type="primary", disabled=not can_search, use_cont
                     st.session_state["last_query"] = final_query
                     log_search(final_query, [ai_data], [result["total_cost"]], part_volume, unit_system, get_currency_symbol(unit_system))
                     status.update(label="Analysis complete", state="complete")
+                    if not st.session_state.get("tour_active"):
+                        scroll_to_anchor("tour-step-2-anchor")
             else:
                 status.write("Ranking top candidates...")
                 results_list = get_top3_recommendations(client, db_string, final_query, model_name, cost_instruction)
@@ -635,6 +656,8 @@ if st.button("Find materials", type="primary", disabled=not can_search, use_cont
                     st.session_state["chat_context"] = f"Current Material Database Context:\n{db_string}\nCost Source: {cost_source}\nCalculated Costs: {cost_values}"
                     log_search(final_query, results_list, cost_values, part_volume, unit_system, get_currency_symbol(unit_system))
                     status.update(label="Analysis complete", state="complete")
+                    if not st.session_state.get("tour_active"):
+                        scroll_to_anchor("tour-step-3-anchor")
 
         except Exception as e:
             status.update(label="Analysis failed", state="error")

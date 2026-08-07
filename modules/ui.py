@@ -1,17 +1,40 @@
-"""Shared UI theme, CSS, and reusable Streamlit presentation helpers."""
+"""Shared UI theme, CSS, and reusable Streamlit presentation helpers.
+
+Design system: single dark theme (see .streamlit/config.toml for the
+matching native-widget palette). Every color used anywhere in this module
+traces back to the token set below — no scattered magic hex values — so the
+app reads as one deliberately designed surface rather than a patchwork.
+Light-mode media queries were removed on purpose: the app was dark-first
+from the start (charts, cards, sidebar all assumed a dark background), so a
+partial light variant only produced a broken hybrid for light-OS visitors.
+Committing to one polished theme beats half-supporting two.
+"""
+
+import base64
 
 import streamlit as st
 
-# ── Design tokens (SaaS theme) ─────────────────────────────────────────
-ACCENT = "#58a6ff"  # Enterprise Blue
+# ── Design tokens ───────────────────────────────────────────────────────
+ACCENT = "#58a6ff"
+ACCENT_STRONG = "#1f6feb"          # solid button fill
+ACCENT_STRONG_HOVER = "#388bfd"
 ACCENT_DIM = "rgba(56, 139, 253, 0.1)"
-ACCENT_BORDER = "#30363d"
-SURFACE = "#161b22"
-SURFACE_LIGHT = "#f6f8fa"
+BORDER = "#30363d"                 # card/panel outline
+BORDER_HOVER = "#484f58"
+SURFACE = "#161b22"                # card / sidebar background
+SURFACE_INSET = "#0d1117"          # recessed elements: page bg, chips, track fills
+TEXT_HEADING = "#f0f6fc"
+TEXT_BODY = "#c9d1d9"
 TEXT_MUTED = "#8b949e"
 SUCCESS = "#2ea44f"
 WARNING = "#d29922"
 DANGER = "#f85149"
+RADIUS = "6px"
+RADIUS_LG = "10px"
+
+# Back-compat alias — SURFACE_LIGHT is no longer used (dark-only theme) but
+# kept as a no-op alias in case another module still imports it.
+SURFACE_LIGHT = SURFACE
 
 
 def inject_theme():
@@ -23,12 +46,21 @@ def inject_theme():
 
 :root {{
     --accent: {ACCENT};
+    --accent-strong: {ACCENT_STRONG};
+    --accent-strong-hover: {ACCENT_STRONG_HOVER};
     --accent-dim: {ACCENT_DIM};
-    --accent-border: {ACCENT_BORDER};
+    --border: {BORDER};
+    --border-hover: {BORDER_HOVER};
     --surface: {SURFACE};
+    --surface-inset: {SURFACE_INSET};
+    --text-heading: {TEXT_HEADING};
+    --text-body: {TEXT_BODY};
     --text-muted: {TEXT_MUTED};
     --success: {SUCCESS};
-    --radius: 6px;
+    --warning: {WARNING};
+    --danger: {DANGER};
+    --radius: {RADIUS};
+    --radius-lg: {RADIUS_LG};
 }}
 
 .block-container {{
@@ -47,33 +79,20 @@ div[data-testid="stMetric"],
 div[data-testid="stVerticalBlockBorderWrapper"] {{
     background: var(--surface) !important;
     border-radius: var(--radius) !important;
-    border: 1px solid var(--accent-border) !important;
+    border: 1px solid var(--border) !important;
     box-shadow: none !important;
     transition: border-color 0.2s ease !important;
 }}
 
 div[data-testid="stExpander"]:hover,
 div[data-testid="stMetric"]:hover {{
-    border-color: #8b949e !important;
-}}
-
-@media (prefers-color-scheme: light) {{
-    div[data-testid="stExpander"],
-    div[data-testid="stMetric"],
-    div[data-testid="stVerticalBlockBorderWrapper"] {{
-        background: {SURFACE_LIGHT} !important;
-        border: 1px solid #e1e4e8 !important;
-    }}
-    div[data-testid="stExpander"]:hover,
-    div[data-testid="stMetric"]:hover {{
-        border-color: #959da5 !important;
-    }}
+    border-color: var(--border-hover) !important;
 }}
 
 /* ── Buttons ── */
 button[kind="primary"] {{
-    background: #1f6feb !important;
-    border: 1px solid #388bfd !important;
+    background: var(--accent-strong) !important;
+    border: 1px solid var(--accent-strong-hover) !important;
     border-radius: var(--radius) !important;
     color: #ffffff !important;
     font-family: 'Inter', sans-serif !important;
@@ -85,14 +104,14 @@ button[kind="primary"] {{
     letter-spacing: normal !important;
 }}
 button[kind="primary"]:hover:not(:disabled) {{
-    background: #388bfd !important;
-    border-color: #58a6ff !important;
+    background: var(--accent-strong-hover) !important;
+    border-color: var(--accent) !important;
     box-shadow: none !important;
     transform: none !important;
 }}
 button[kind="primary"]:disabled {{
     opacity: 0.5 !important;
-    background: #1f6feb !important;
+    background: var(--accent-strong) !important;
 }}
 
 button[kind="secondary"] {{
@@ -100,12 +119,10 @@ button[kind="secondary"] {{
     font-size: 0.875rem !important;
 }}
 
-
-
 /* ── Tabs ── */
 div[data-testid="stTabs"] [data-baseweb="tab-list"] {{
     gap: 8px;
-    border-bottom: 1px solid var(--accent-border);
+    border-bottom: 1px solid var(--border);
     padding-bottom: 0;
 }}
 div[data-testid="stTabs"] button {{
@@ -121,28 +138,17 @@ div[data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] {{
     color: var(--accent) !important;
 }}
 
-/* ── Sidebar visually matched ── */
+/* ── Sidebar ── */
 section[data-testid="stSidebar"] {{
     background: var(--surface) !important;
-    border-right: 1px solid var(--accent-border) !important;
+    border-right: 1px solid var(--border) !important;
 }}
 section[data-testid="stSidebar"] .stMarkdown h1,
 section[data-testid="stSidebar"] .stMarkdown h2,
 section[data-testid="stSidebar"] .stMarkdown h3 {{
     font-family: 'Inter', sans-serif;
     font-weight: 600;
-    color: #f0f6fc;
-}}
-@media (prefers-color-scheme: light) {{
-    section[data-testid="stSidebar"] {{
-        background: {SURFACE_LIGHT} !important;
-        border-right: 1px solid #e1e4e8 !important;
-    }}
-    section[data-testid="stSidebar"] .stMarkdown h1,
-    section[data-testid="stSidebar"] .stMarkdown h2,
-    section[data-testid="stSidebar"] .stMarkdown h3 {{
-        color: #24292e;
-    }}
+    color: var(--text-heading) !important;
 }}
 
 /* ── Inputs ── */
@@ -158,7 +164,7 @@ div[data-testid="stRadio"] label {{
 /* ── Chat ── */
 div[data-testid="stChatMessage"] {{
     border-radius: var(--radius) !important;
-    border: 1px solid #21262d !important;
+    border: 1px solid var(--surface-inset) !important;
 }}
 
 /* ── Custom components ── */
@@ -167,7 +173,7 @@ div[data-testid="stChatMessage"] {{
     font-size: 2rem;
     font-weight: 700;
     line-height: 1.25;
-    color: #f0f6fc;
+    color: var(--text-heading) !important;
 }}
 .hero-subtitle {{
     margin: 8px 0 0 0;
@@ -189,15 +195,15 @@ div[data-testid="stChatMessage"] {{
     font-weight: 600;
     margin: 0 0 12px 0;
     padding-bottom: 8px;
-    border-bottom: 1px solid var(--accent-border);
-    color: #f0f6fc;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-heading) !important;
 }}
 .template-pill {{
     display: inline-block;
     padding: 6px 12px;
     margin: 4px 6px 4px 0;
     border-radius: 12px;
-    border: 1px solid var(--accent-border);
+    border: 1px solid var(--border);
     background: var(--accent-dim);
     font-size: 0.8rem;
     font-weight: 500;
@@ -211,13 +217,13 @@ div[data-testid="stChatMessage"] {{
     margin-right: 6px;
     vertical-align: middle;
 }}
-.status-dot.online {{ background: {SUCCESS}; }}
-.status-dot.offline {{ background: {DANGER}; }}
+.status-dot.online {{ background: var(--success); }}
+.status-dot.offline {{ background: var(--danger); }}
 
 .confidence-bar {{
     height: 5px;
     border-radius: 3px;
-    background: #21262d;
+    background: var(--surface-inset);
     overflow: hidden;
     margin-top: 6px;
 }}
@@ -234,7 +240,7 @@ div[data-testid="stChatMessage"] {{
     font-size: 0.75rem;
     background: rgba(56, 139, 253, 0.15);
     border: 1px solid rgba(56, 139, 253, 0.3);
-    color: #58a6ff;
+    color: var(--accent);
 }}
 .con-tag {{
     display: inline-block;
@@ -258,9 +264,9 @@ div[data-testid="stChatMessage"] {{
     border-radius: 4px;
     font-size: 0.75rem;
     font-family: 'JetBrains Mono', monospace;
-    background: #161b22;
-    border: 1px solid var(--accent-border);
-    color: #c9d1d9;
+    background: var(--surface-inset);
+    border: 1px solid var(--border);
+    color: var(--text-body);
 }}
 .app-footer {{
     position: fixed !important;
@@ -268,7 +274,7 @@ div[data-testid="stChatMessage"] {{
     right: 1.5rem !important;
     font-size: 0.78rem !important;
     font-weight: 500 !important;
-    color: #8b949e !important;
+    color: var(--text-muted) !important;
     background: rgba(22, 27, 34, 0.85) !important;
     opacity: 1 !important;
     padding: 5px 14px !important;
@@ -291,14 +297,68 @@ div[data-testid="stChatMessage"] {{
     outline: none !important;
     padding: 0 !important;
     margin: 0 !important;
-    color: #8b949e !important;
+    color: var(--text-muted) !important;
     font-weight: 500 !important;
     text-shadow: none !important;
 }}
 
-
-
-
+/* ── Step tracker ── */
+.stepper {{
+    display: flex;
+    align-items: flex-start;
+    margin: 4px 0 28px 0;
+}}
+.stepper-item {{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 0 0 auto;
+}}
+.stepper-connector {{
+    flex: 1 1 auto;
+    height: 2px;
+    background: var(--border);
+    margin: 15px 8px 0 8px;
+    border-radius: 1px;
+    transition: background 0.3s ease;
+}}
+.stepper-connector.done {{ background: var(--success); }}
+.stepper-circle {{
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    border: 2px solid var(--border);
+    color: var(--text-muted);
+    background: var(--surface);
+    transition: all 0.25s ease;
+}}
+.stepper-circle.active {{
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+    box-shadow: 0 0 0 4px var(--accent-dim);
+}}
+.stepper-circle.done {{
+    border-color: var(--success);
+    color: #ffffff;
+    background: var(--success);
+}}
+.stepper-label {{
+    margin-top: 8px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-align: center;
+    max-width: 110px;
+}}
+.stepper-item.is-active .stepper-label {{ color: var(--text-heading); }}
+.stepper-item.is-done .stepper-label {{ color: var(--text-body); }}
 
 /* ── Tour highlights & spotlight ── */
 .tour-backdrop {{
@@ -313,7 +373,6 @@ div[data-testid="stChatMessage"] {{
     transition: opacity 0.3s ease;
 }}
 
-/* Raise active container and its layout ancestors above the backdrop */
 div[data-testid="stVerticalBlock"]:has(.tour-banner-active),
 div[class*="stColumn"]:has(.tour-banner-active) {{
     position: relative !important;
@@ -323,20 +382,13 @@ div[class*="stColumn"]:has(.tour-banner-active) {{
 div[data-testid="stVerticalBlockBorderWrapper"]:has(.tour-banner-active) {{
     position: relative !important;
     z-index: 999999 !important;
-    border: 2px solid #2ea44f !important;
+    border: 2px solid var(--success) !important;
     box-shadow: 0 0 35px rgba(46, 164, 79, 0.6) !important;
-    background: #161b22 !important;
+    background: var(--surface) !important;
     transition: border-color 0.3s ease, box-shadow 0.3s ease, z-index 0.3s ease !important;
 }}
 
-@media (prefers-color-scheme: light) {{
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.tour-banner-active) {{
-        background: #ffffff !important;
-        box-shadow: 0 0 35px rgba(46, 164, 79, 0.4) !important;
-    }}
-}}
-
-/* ── Mechanical Loader Override (Rotating Gear) ── */
+/* ── Mechanical loader override (rotating gear) ── */
 div[data-testid="stSpinner"] [role="progressbar"],
 div[data-testid="stSpinner"] svg,
 div[data-testid="stStatusWidget"] svg[class*="Spinner"],
@@ -378,6 +430,7 @@ button:has(div[class*="spinner"]) div {{
     0% {{ transform: rotate(0deg); }}
     100% {{ transform: rotate(360deg); }}
 }}
+
 /* Keep header for sidebar toggle, but make background transparent and hide deploy/options menu */
 [data-testid="stHeader"] {{
     background: transparent !important;
@@ -413,6 +466,31 @@ def render_hero(mode_label: str):
     )
 
 
+def render_stepper(labels: list[str], current: int, done: set[int]):
+    """Premium horizontal step tracker. `labels` are the step names in
+    order, `current` is the 0-based index in focus, `done` is the set of
+    0-based indices already completed. Pure presentation — callers derive
+    state from whatever signals they already have (no new session state
+    required)."""
+    items = []
+    for i, label in enumerate(labels):
+        is_done = i in done
+        is_active = i == current and not is_done
+        circle_class = "done" if is_done else ("active" if is_active else "")
+        item_class = "is-done" if is_done else ("is-active" if is_active else "")
+        content = "✓" if is_done else str(i + 1)
+        items.append(
+            f'<div class="stepper-item {item_class}">'
+            f'<div class="stepper-circle {circle_class}">{content}</div>'
+            f'<div class="stepper-label">{label}</div>'
+            f'</div>'
+        )
+        if i < len(labels) - 1:
+            connector_class = "done" if i in done else ""
+            items.append(f'<div class="stepper-connector {connector_class}"></div>')
+    st.markdown(f'<div class="stepper">{"".join(items)}</div>', unsafe_allow_html=True)
+
+
 def section_header(step: str, title: str, subtitle: str = ""):
     sub = f'<p style="margin: 2px 0 0 0; font-size: 0.8rem; color: {TEXT_MUTED};">{subtitle}</p>' if subtitle else ""
     st.markdown(
@@ -440,9 +518,9 @@ def render_status_banner(message: str, kind: str = "info"):
 <div style="
     padding: 10px 16px; margin-bottom: 16px;
     border-radius: var(--radius); border-left: 3px solid {color};
-    background: #161b22;
+    background: {SURFACE};
     font-size: 0.875rem;
-    color: #c9d1d9;
+    color: {TEXT_BODY};
 ">
     <strong>{kind.upper()}:</strong> {message}
 </div>
@@ -456,7 +534,7 @@ def render_empty_state(icon: str, title: str, body: str):
     st.markdown(
         f"""
 <div class="empty-state">
-    <p style="font-size: 0.95rem; font-weight: 600; color: #c9d1d9; margin-bottom: 6px;">{title}</p>
+    <p style="font-size: 0.95rem; font-weight: 600; color: {TEXT_BODY}; margin-bottom: 6px;">{title}</p>
     <p style="font-size: 0.85rem; margin: 0;">{body}</p>
 </div>
 """,
@@ -498,27 +576,14 @@ def render_filter_summary(chips: list[str]):
     )
 
 
-def render_progress_tracker(steps: list[tuple[str, bool]]):
-    """Render a vertical progress tracker without emojis or custom fonts."""
-    lines = []
-    for i, (label, done) in enumerate(steps):
-        color = ACCENT if done else TEXT_MUTED
-        icon = "Done" if done else "Pending"
-        lines.append(
-            f'<div style="font-size:0.8rem; color:{color}; padding: 2px 0;">'
-            f'[{icon}] {label}</div>'
-        )
-    st.markdown("".join(lines), unsafe_allow_html=True)
-
-
 def render_sidebar_status(api_connected: bool, material_count: int):
     dot_class = "online" if api_connected else "offline"
     status_text = "API Connected" if api_connected else "API Key Required"
     st.markdown(
         f"""
-<div style="padding: 12px; border-radius: var(--radius); border: 1px solid var(--accent-border); margin-bottom: 16px; background: #161b22;">
+<div style="padding: 12px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 16px; background: {SURFACE};">
     <span class="status-dot {dot_class}"></span>
-    <span style="font-size: 0.85rem; font-weight: 600; color: #f0f6fc;">{status_text}</span>
+    <span style="font-size: 0.85rem; font-weight: 600; color: {TEXT_HEADING};">{status_text}</span>
     <p style="margin: 4px 0 0 0; font-size: 0.75rem; color: {TEXT_MUTED};">
         {material_count} materials in database
     </p>
@@ -535,11 +600,11 @@ def render_footer():
     )
 
 
-
-
-def render_tour_banner(step_num: int, total_steps: int, title: str, text: str, key_prefix: str):
-    """Render a premium green-bordered guided tour card with compact controls and auto-scroll."""
-    # Render scroll trigger using the Streamlit HTML component to bypass Markdown security sanitization
+def scroll_to_anchor(anchor_id: str, attempts: int = 30, delay_ms: int = 100):
+    """Smooth-scroll the page (searching parent/top window contexts, since
+    Streamlit components render inside an iframe) to an element with the
+    given id, retrying briefly in case it hasn't painted yet. Shared by the
+    guided tour and the post-analysis auto-scroll-to-results."""
     js_code = f"""
     <script>
         (function() {{
@@ -553,40 +618,43 @@ def render_tour_banner(step_num: int, total_steps: int, title: str, text: str, k
                 try {{
                     if (window.top && window.top.document) doc = window.top.document;
                 }} catch(e) {{}}
-                
-                var el = doc.getElementById('tour-step-{step_num}-anchor');
+
+                var el = doc.getElementById('{anchor_id}');
                 if (el) {{
-                    console.log('Found tour anchor tour-step-{step_num}-anchor on attempt ' + attempts);
-                    el.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+                    el.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
                     clearInterval(interval);
-                }} else if (attempts >= 30) {{
-                    console.log('Failed to find tour anchor after 30 attempts');
+                }} else if (attempts >= {attempts}) {{
                     clearInterval(interval);
                 }}
-            }}, 100);
+            }}, {delay_ms});
         }})();
     </script>
     """
     st.components.v1.html(js_code, height=0, width=0)
-    
+
+
+def render_tour_banner(step_num: int, total_steps: int, title: str, text: str, key_prefix: str):
+    """Render a premium green-bordered guided tour card with compact controls and auto-scroll."""
+    scroll_to_anchor(f"tour-step-{step_num}-anchor")
+
     html_content = f"""
 <div class="tour-banner-active" style="
-    border: 2px solid #2ea44f; 
-    background: rgba(46, 164, 79, 0.05); 
-    padding: 16px; 
-    border-radius: 6px; 
+    border: 2px solid {SUCCESS};
+    background: rgba(46, 164, 79, 0.05);
+    padding: 16px;
+    border-radius: 6px;
     margin-bottom: 16px;
     box-shadow: 0 4px 12px rgba(46, 164, 79, 0.15);
 ">
-    <div style="font-size: 0.72rem; font-weight: 700; color: #2ea44f; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; font-family: 'Inter', sans-serif;">
+    <div style="font-size: 0.72rem; font-weight: 700; color: {SUCCESS}; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; font-family: 'Inter', sans-serif;">
         Guide Tour · Step {step_num} of {total_steps}
     </div>
-    <h4 style="margin: 0 0 6px 0; color: #2ea44f; font-weight: 600; font-family: 'Inter', sans-serif;">{title}</h4>
-    <p style="margin: 0; font-size: 0.875rem; color: var(--text-muted); line-height: 1.4; font-family: 'Inter', sans-serif;">{text}</p>
+    <h4 style="margin: 0 0 6px 0; color: {SUCCESS}; font-weight: 600; font-family: 'Inter', sans-serif;">{title}</h4>
+    <p style="margin: 0; font-size: 0.875rem; color: {TEXT_MUTED}; line-height: 1.4; font-family: 'Inter', sans-serif;">{text}</p>
 </div>"""
-    
+
     st.markdown(html_content, unsafe_allow_html=True)
-    
+
     # Compact navigation controls
     btn_cols = st.columns([0.8, 0.8, 1, 4])
     with btn_cols[0]:
@@ -632,3 +700,82 @@ def inject_clarity():
     """
     st.components.v1.html(js_code, height=0, width=0)
 
+
+def render_stl_viewer(stl_bytes: bytes, height: int = 420):
+    """Embed a lightweight three.js viewer (rotate/zoom via mouse) for a CAD
+    Studio preview mesh, so users can inspect a specimen before downloading
+    it rather than trusting a blind export. Self-contained per render call —
+    three.js is loaded from CDN, standard for a server-rendered Streamlit
+    component (unlike a published Artifact, this iframe has normal network
+    access)."""
+    b64 = base64.b64encode(stl_bytes).decode("ascii")
+    html = f"""
+    <div id="stl-viewer-root" style="width:100%;height:{height}px;border-radius:12px;
+        overflow:hidden;background:{SURFACE};border:1px solid {BORDER};"></div>
+    <div id="stl-viewer-hint" style="color:{TEXT_MUTED};font-size:12px;margin-top:6px;
+        font-family:Inter,sans-serif;">Drag to rotate · scroll to zoom</div>
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+    (function() {{
+        var root = document.getElementById('stl-viewer-root');
+        var height = {height};
+        var width = root.clientWidth || 600;
+
+        var scene = new THREE.Scene();
+        scene.background = new THREE.Color('{SURFACE}');
+
+        var camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100000);
+        var renderer = new THREE.WebGLRenderer({{ antialias: true }});
+        renderer.setSize(width, height);
+        root.appendChild(renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+        var dl1 = new THREE.DirectionalLight(0xffffff, 0.75);
+        dl1.position.set(1, 1, 1);
+        scene.add(dl1);
+        var dl2 = new THREE.DirectionalLight(0xffffff, 0.35);
+        dl2.position.set(-1, -1, -0.5);
+        scene.add(dl2);
+
+        var raw = atob("{b64}");
+        var buf = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+
+        var geometry = new THREE.STLLoader().parse(buf.buffer);
+        geometry.center();
+        geometry.computeBoundingSphere();
+
+        var material = new THREE.MeshStandardMaterial({{
+            color: 0x4fd1c5, metalness: 0.2, roughness: 0.6, side: THREE.DoubleSide,
+        }});
+        var mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        var radius = (geometry.boundingSphere && geometry.boundingSphere.radius) || 20;
+        camera.position.set(radius * 2.2, radius * 1.6, radius * 2.2);
+        camera.lookAt(0, 0, 0);
+
+        var controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0, 0);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.update();
+
+        (function animate() {{
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }})();
+
+        window.addEventListener('resize', function() {{
+            var w = root.clientWidth || width;
+            camera.aspect = w / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, height);
+        }});
+    }})();
+    </script>
+    """
+    st.components.v1.html(html, height=height + 30, scrolling=False)

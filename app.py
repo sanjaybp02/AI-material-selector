@@ -151,7 +151,13 @@ def render_template_picker(templates):
     if len(filtered) > 12:
         st.caption(f"Showing 12 of {len(filtered)} templates. Refine search to find more.")
 
-    if st.button("+ Create custom template", use_container_width=True):
+    # tertiary + content-width: a lightweight "add new" action shouldn't
+    # compete visually with the template grid above it — a full-width
+    # secondary button read as louder/bigger than the compact grid
+    # buttons even at an identical font-size (confirmed via computed
+    # style: both were 14px/400 — the size wasn't the issue, the visual
+    # density was).
+    if st.button("+ Create custom template", type="tertiary", use_container_width=False):
         create_template_dialog()
 
 

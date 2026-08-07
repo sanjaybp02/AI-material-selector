@@ -260,6 +260,18 @@ button[kind="secondary"] {{
     border-radius: var(--radius) !important;
     font-size: 0.875rem !important;
 }}
+/* Tertiary: a lightweight ghost action (e.g. "+ Create custom
+   template") that shouldn't visually compete with primary/secondary
+   buttons nearby — no border/fill at rest, accent color on hover. */
+button[kind="tertiary"] {{
+    font-size: 0.8rem !important;
+    color: var(--text-muted) !important;
+    padding: 0.3rem 0.5rem !important;
+    transition: color 0.2s ease !important;
+}}
+button[kind="tertiary"]:hover:not(:disabled) {{
+    color: var(--accent) !important;
+}}
 
 /* ── Tabs ── */
 div[data-testid="stTabs"] [data-baseweb="tab-list"] {{

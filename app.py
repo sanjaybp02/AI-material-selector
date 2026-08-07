@@ -210,35 +210,40 @@ def render_lite_results(r, currency, unit_system):
 
 def render_advanced_results(processed, rec_names, df_display, unit_system, api_key, model_name):
     currency = get_currency_symbol(unit_system)
+
+    # Ranked summary is rendered above the tabs (not inside "Results") so it
+    # stays visible no matter which tab — Charts, Compare, History — is
+    # active, instead of disappearing the moment you look at a chart.
+    st.caption(f"{len(processed)} candidate(s) ranked by suitability")
+    summary_rows = []
+    for rank, item in enumerate(processed, start=1):
+        mass_display, mass_unit = format_mass(item["result"], unit_system)
+        carbon_val = item.get("total_carbon_kg", 0.0)
+        carbon_unit = "kg CO2"
+        if unit_system == "Imperial":
+            carbon_val = carbon_val * 2.20462
+            carbon_unit = "lb CO2"
+        summary_rows.append({
+            "Rank": rank,
+            "Material": item["exact_name"],
+            "Confidence": f"{item['confidence']}%",
+            "Cost": f"{currency}{item['result']['total_cost']:.2f}",
+            "Mass": f"{mass_display:.2f} {mass_unit}",
+            "Carbon": f"{carbon_val:.3f} {carbon_unit}",
+        })
+    if summary_rows:
+        st.dataframe(
+            pd.DataFrame(summary_rows),
+            hide_index=True,
+            use_container_width=True,
+        )
+        st.caption("Open a candidate in the Results tab for engineering reasoning, exports, and datasheet details.")
+
     tab_results, tab_charts, tab_compare, tab_history = st.tabs(
         ["Results", "Charts", "Compare", "History"]
     )
 
     with tab_results:
-        st.caption(f"{len(processed)} candidate(s) ranked by suitability")
-        summary_rows = []
-        for rank, item in enumerate(processed, start=1):
-            mass_display, mass_unit = format_mass(item["result"], unit_system)
-            carbon_val = item.get("total_carbon_kg", 0.0)
-            carbon_unit = "kg CO2"
-            if unit_system == "Imperial":
-                carbon_val = carbon_val * 2.20462
-                carbon_unit = "lb CO2"
-            summary_rows.append({
-                "Rank": rank,
-                "Material": item["exact_name"],
-                "Confidence": f"{item['confidence']}%",
-                "Cost": f"{currency}{item['result']['total_cost']:.2f}",
-                "Mass": f"{mass_display:.2f} {mass_unit}",
-                "Carbon": f"{carbon_val:.3f} {carbon_unit}",
-            })
-        if summary_rows:
-            st.dataframe(
-                pd.DataFrame(summary_rows),
-                hide_index=True,
-                use_container_width=True,
-            )
-            st.caption("Open a candidate below for engineering reasoning, exports, and datasheet details.")
         for rank, item in enumerate(processed):
             rank_label = f"Rank {rank + 1}"
             mass_display, mass_unit = format_mass(item["result"], unit_system)

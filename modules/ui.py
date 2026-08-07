@@ -327,31 +327,38 @@ hr {{
     pointer-events: none;
     z-index: -1;
 }}
+/* font-size/font-weight need !important here for the same reason color
+   did (see the [data-testid="stApp"] :is(h1,...) comment above):
+   Streamlit's own ".st-emotion-cache-XXXX h1, h2, h3..." rules target
+   heading tags with class+type specificity, which beats a plain single
+   class selector like .hero-title with no !important — confirmed live
+   (hero-title's intended 1.65rem was losing to Streamlit's ~2.75rem
+   default before this was added). */
 .hero-title {{
     margin: 0;
-    font-size: 1.65rem;
-    font-weight: 700;
-    line-height: 1.25;
+    font-size: 1.65rem !important;
+    font-weight: 700 !important;
+    line-height: 1.25 !important;
     color: var(--text-heading) !important;
 }}
 .hero-subtitle {{
     margin: 6px 0 0 0;
-    font-size: 0.875rem;
-    color: var(--text-muted);
-    font-weight: 400;
+    font-size: 0.875rem !important;
+    color: var(--text-muted) !important;
+    font-weight: 400 !important;
     max-width: 700px;
 }}
 .section-label {{
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
     letter-spacing: 0.5px;
     text-transform: uppercase;
-    color: var(--accent);
+    color: var(--accent) !important;
     margin-bottom: 2px;
 }}
 .section-title {{
-    font-size: 1.1rem;
-    font-weight: 600;
+    font-size: 1.1rem !important;
+    font-weight: 600 !important;
     margin: 0 0 12px 0;
     padding-bottom: 8px;
     border-bottom: 1px solid var(--border);

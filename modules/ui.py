@@ -96,6 +96,31 @@ div[data-testid="stCode"] *,
     font-family: 'JetBrains Mono', monospace !important;
 }}
 
+/* ── Global heading + caption scale ──
+   Found live (not guessed): st.markdown("##### Subsection") calls
+   scattered across app.py/filters.py/history.py were all rendering at
+   whatever size Streamlit's own theme happens to default h5 to —
+   sometimes visually larger than the h3 "STEP N" section titles above
+   them — while a neighboring plain st.markdown("Some helper sentence.")
+   with no heading markup rendered at full body size, and a *different*
+   helper line elsewhere used st.caption() (small/muted). Three
+   different sizes for what's semantically the same two roles (section
+   subheading, helper text), depending on which call site happened to
+   use which pattern. Fixing the call sites case-by-case would only
+   last until the next one is added the "wrong" way — this defines the
+   scale once, globally, for every heading level and every st.caption()
+   in the app, so it can't drift inconsistent again regardless of which
+   module emits the text. Custom classes (.hero-title, .section-title)
+   still win where they exist, via ordinary higher specificity — this
+   is the *fallback* baseline for every other heading. */
+[data-testid="stApp"] h1 {{ font-size: 1.65rem !important; font-weight: 700 !important; }}
+[data-testid="stApp"] h2 {{ font-size: 1.3rem !important; font-weight: 700 !important; }}
+[data-testid="stApp"] h3 {{ font-size: 1.1rem !important; font-weight: 600 !important; }}
+[data-testid="stApp"] h4 {{ font-size: 1rem !important; font-weight: 600 !important; }}
+[data-testid="stApp"] h5 {{ font-size: 0.95rem !important; font-weight: 600 !important; }}
+[data-testid="stApp"] h6 {{ font-size: 0.85rem !important; font-weight: 600 !important; }}
+[data-testid="stCaptionContainer"] {{ font-size: 0.8rem !important; }}
+
 /* ── Cards & containers ──
    NOTE on the Step 1/2/3 card selector: in older Streamlit,
    st.container(border=True) rendered inside a dedicated

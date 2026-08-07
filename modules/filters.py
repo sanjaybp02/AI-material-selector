@@ -87,7 +87,7 @@ def render_filters(df, mode, unit_system, settings):
     filter_meta = {}
     summary_meta = {}
 
-    st.markdown("Use sliders to narrow the candidate pool before AI analysis.")
+    st.caption("Use sliders to narrow the candidate pool before AI analysis.")
 
     # Category filter
     if "Category" in df.columns:

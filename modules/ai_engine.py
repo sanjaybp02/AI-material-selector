@@ -2,6 +2,29 @@ import json
 import time
 
 
+def _require_text(response):
+    """Gemini can return a response with no usable text (blocked by safety
+    filters, hit a token limit before finishing, etc.) — response.text is
+    then None. Every caller here immediately calls .replace()/returns it
+    directly, which would surface as a raw 'NoneType has no attribute
+    replace' AttributeError to the user instead of an explanation. Raise a
+    clear, actionable error instead."""
+    text = getattr(response, "text", None)
+    if not text:
+        finish_reason = None
+        try:
+            finish_reason = response.candidates[0].finish_reason
+        except Exception:
+            pass
+        detail = f" (finish_reason: {finish_reason})" if finish_reason else ""
+        raise ValueError(
+            f"The AI returned no usable response{detail} — it may have been "
+            f"blocked by content filters or hit a length limit. Try "
+            f"rephrasing your request."
+        )
+    return text
+
+
 def call_gemini_with_retry(client, model_name, contents):
     """
     Call Gemini generate_content with retries and stable fallback models on transient 503/429 errors
@@ -85,7 +108,7 @@ def get_single_recommendation(client, db_string, query, model_name, cost_instruc
     """
 
     response = call_gemini_with_retry(client, model_name, prompt)
-    raw_text = response.text.replace("```json", "").replace("```", "").strip()
+    raw_text = _require_text(response).replace("```json", "").replace("```", "").strip()
     return json.loads(raw_text)
 
 
@@ -146,7 +169,7 @@ def get_top3_recommendations(client, db_string, query, model_name, cost_instruct
     """
 
     response = call_gemini_with_retry(client, model_name, prompt)
-    raw_text = response.text.replace("```json", "").replace("```", "").strip()
+    raw_text = _require_text(response).replace("```json", "").replace("```", "").strip()
     results = json.loads(raw_text)
 
     # Ensure we always return a list
@@ -204,7 +227,7 @@ def chat_followup(client, conversation_history, question, model_name, context_da
     })
 
     response = call_gemini_with_retry(client, model_name, contents)
-    return response.text
+    return _require_text(response)
 
 
 def explain_filter_failure(client, filter_vals, model_name):

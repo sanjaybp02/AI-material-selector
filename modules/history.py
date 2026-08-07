@@ -190,9 +190,12 @@ def render_history_table():
     # Save button displays dynamically if changes are made
     if not display_df.equals(edited_df):
         if st.button("Save Changes to Database", type="primary", use_container_width=True):
-            save_history_changes(edited_df)
-            st.success("Database successfully updated!")
-            st.rerun()
+            try:
+                save_history_changes(edited_df)
+                st.success("Database successfully updated!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Could not save changes: {e}")
 
     col_dl1, col_dl2 = st.columns(2)
     with col_dl1:

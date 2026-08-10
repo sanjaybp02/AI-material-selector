@@ -1,6 +1,5 @@
 # Hot-reload trigger: 2026-07-21
 import os
-import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -31,7 +30,6 @@ from modules.ui import (
     inject_clarity, render_stl_viewer, render_stepper, scroll_to_anchor, mark_step_cards,
 )
 
-SETTINGS_FILE = "settings.json"
 MODEL_OPTIONS = [
     "gemini-2.5-flash", "gemini-2.5-pro",
     "gemini-2.0-flash", "gemini-2.0-flash-lite",
@@ -39,22 +37,6 @@ MODEL_OPTIONS = [
     "gemini-flash-latest", "gemini-pro-latest",
 ]
 COST_OPTIONS = ["Use CSV Database Pricing", "Use AI Market Estimation", "Use Live MetalPrice API"]
-
-
-# ── Settings ────────────────────────────────────────────────────────
-def load_settings():
-    if os.path.exists(SETTINGS_FILE):
-        try:
-            with open(SETTINGS_FILE, "r") as f:
-                return json.load(f)
-        except Exception:
-            pass
-    return {}
-
-
-def save_settings(s):
-    with open(SETTINGS_FILE, "w") as f:
-        json.dump(s, f)
 
 
 def match_material(df_raw, mat_name):
@@ -506,12 +488,18 @@ inject_theme()
 inject_clarity()
 
 # Load main application data
-settings = load_settings()
 df_raw = load_data()
 init_history()
 
+# All UI preferences below (mode, units, sliders, ...) are seeded with
+# fixed defaults and rely on Streamlit's own per-browser-session widget
+# state to stay "sticky" within one visitor's session — nothing is read
+# from or written to server-side disk. This deployment serves many
+# concurrent visitors from one shared process; a server-side settings
+# file would leak one visitor's choices (filters, units, even the API
+# key — see the api_key_input fix above) to every other visitor as
+# their default. See also the api_key_input comment below.
 env_api_key = os.getenv("GEMINI_API_KEY", "")
-app_mode = settings.get("mode", "Advanced")
 
 # Sidebar
 with st.sidebar:
@@ -545,14 +533,15 @@ with st.sidebar:
     model_name = st.selectbox(
         "Model",
         MODEL_OPTIONS,
-        index=MODEL_OPTIONS.index(settings.get("model_name", MODEL_OPTIONS[0]))
-        if settings.get("model_name") in MODEL_OPTIONS else 0,
+        index=0,
+        key="model_name_select",
     )
     st.divider()
     mode = st.radio(
         "Mode",
         ["Lite", "Advanced"],
-        index=0 if settings.get("mode", "Advanced") == "Lite" else 1,
+        index=1,
+        key="mode_select",
         help="""**Lite Mode**
 - **Instant Answers**: Get a single, direct material recommendation in seconds.
 - **Zero Clutter**: Clean interface that skips complex filters.
@@ -570,10 +559,11 @@ with st.sidebar:
             "Units",
             ["Metric", "Imperial"],
             horizontal=True,
-            index=0 if settings.get("unit_system", "Metric") == "Metric" else 1,
+            index=0,
+            key="unit_system_select",
         )
     else:
-        unit_system = settings.get("unit_system", "Metric")
+        unit_system = st.session_state.get("unit_system_select", "Metric")
 
     # Industry constraint packs (filters.py) store curated preset values
     # (e.g. Aerospace: min yield 300 MPa in Metric, 43500 psi in Imperial)
@@ -660,14 +650,15 @@ with st.container(border=True):
         part_volume = st.number_input(
             f"Part volume ({vol_unit})",
             min_value=1.0,
-            value=float(settings.get("part_volume", 50.0)),
+            value=50.0,
             step=10.0,
+            key="part_volume_input",
         )
-        default_cost = settings.get("cost_source", COST_OPTIONS[0])
         cost_source = st.radio(
             "Cost data source",
             options=COST_OPTIONS,
-            index=COST_OPTIONS.index(default_cost) if default_cost in COST_OPTIONS else 0,
+            index=0,
+            key="cost_source_select",
         )
         st.caption("Volume × density × price per kg → estimated raw material cost.")
 
@@ -687,22 +678,13 @@ if is_advanced:
                 "tour_s2"
             )
         section_header("2", "Physical constraints", "Narrow the database before AI ranking.")
-        filtered_df, filter_vals = render_filters(df_display, mode, unit_system, settings)
+        filtered_df, filter_vals = render_filters(df_display, mode, unit_system)
         with st.expander("Candidate database", expanded=True):
             st.caption("Edit values for what-if scenarios — changes apply to this session only.")
             filtered_df = st.data_editor(filtered_df, hide_index=True, use_container_width=True)
 else:
     filtered_df = df_display
     filter_vals = {}
-
-save_settings({
-    "model_name": model_name,
-    "mode": mode,
-    "unit_system": unit_system,
-    "part_volume": part_volume,
-    "cost_source": cost_source,
-    **filter_vals,
-})
 
 # Search readiness
 can_search = True

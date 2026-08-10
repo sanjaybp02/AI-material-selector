@@ -87,7 +87,20 @@ html, body, [class*="css"] {{
    visibly inconsistent mix of two fonts on the same page. Fixed by
    directly targeting every text-bearing tag with !important instead of
    relying on inheritance. */
-[data-testid="stApp"] :is(h1, h2, h3, h4, h5, h6, p, span, div, label, li, a, td, th, button, textarea, input) {{
+/* :not([translate="no"]) excludes Streamlit's Material-Symbols icon
+   ligatures (expander check/error icons, arrow glyphs, alert icons,
+   ...) — Streamlit marks every one of these spans translate="no" and
+   renders them via an icon font where the element's *text content* is
+   literally the icon's name (e.g. "check", "keyboard_arrow_down").
+   This rule used to catch them too (span is in the :is() list), which
+   clobbered their icon font with Inter — the glyph never renders, so
+   the literal word shows up as normal readable text instead (confirmed
+   live: div[data-testid="stExpanderIconCheck"] computed font-family
+   was "Inter, sans-serif" and the page literally read "check" next to
+   "Analysis complete"). Excluding translate="no" elements here leaves
+   Streamlit's own stylesheet — never overridden by us — as the only
+   thing setting their font-family, so the glyph renders correctly. */
+[data-testid="stApp"] :is(h1, h2, h3, h4, h5, h6, p, span, div, label, li, a, td, th, button, textarea, input):not([translate="no"]) {{
     font-family: 'Inter', sans-serif !important;
 }}
 code, pre, kbd, samp,

@@ -1,7 +1,15 @@
-import json
-import os
+import streamlit as st
 
-TEMPLATES_FILE = "templates.json"
+# Custom templates used to live in templates.json, one file on the
+# server's disk shared by every visitor of this deployment — confirmed
+# live: any visitor's saved template (name, description, and full
+# prompt text — which can describe a real, potentially proprietary
+# project) was visible to, and deletable by, every OTHER visitor too.
+# Same root cause as the settings.json / API-key / history.db leaks
+# fixed elsewhere this session. Custom templates now live entirely in
+# st.session_state: private to each visitor, resets when they close
+# their browser.
+_CUSTOM_TEMPLATES_KEY = "custom_templates"
 
 DEFAULT_TEMPLATES = [
     {
@@ -76,13 +84,7 @@ _PRESET_TEMPLATES = [
 ]
 
 def load_templates():
-    custom_templates = []
-    if os.path.exists(TEMPLATES_FILE):
-        try:
-            with open(TEMPLATES_FILE, "r", encoding="utf-8") as f:
-                custom_templates = json.load(f)
-        except Exception:
-            pass
+    custom_templates = st.session_state.get(_CUSTOM_TEMPLATES_KEY, [])
     seen_prompts = set()
     merged = []
     for t in DEFAULT_TEMPLATES + _PRESET_TEMPLATES + custom_templates:
@@ -93,35 +95,15 @@ def load_templates():
     return merged
 
 def save_custom_template(name, description, prompt):
-    custom_templates = []
-    if os.path.exists(TEMPLATES_FILE):
-        try:
-            with open(TEMPLATES_FILE, "r", encoding="utf-8") as f:
-                custom_templates = json.load(f)
-        except Exception:
-            pass
-            
+    custom_templates = st.session_state.get(_CUSTOM_TEMPLATES_KEY, [])
     custom_templates.append({
         "name": name,
         "description": description,
         "prompt": prompt,
         "is_custom": True
     })
-    
-    with open(TEMPLATES_FILE, "w", encoding="utf-8") as f:
-        json.dump(custom_templates, f, indent=4)
+    st.session_state[_CUSTOM_TEMPLATES_KEY] = custom_templates
 
 def delete_custom_template(name):
-    if not os.path.exists(TEMPLATES_FILE):
-        return
-        
-    try:
-        with open(TEMPLATES_FILE, "r", encoding="utf-8") as f:
-            custom_templates = json.load(f)
-    except Exception:
-        return
-        
-    custom_templates = [t for t in custom_templates if t["name"] != name]
-    
-    with open(TEMPLATES_FILE, "w", encoding="utf-8") as f:
-        json.dump(custom_templates, f, indent=4)
+    custom_templates = st.session_state.get(_CUSTOM_TEMPLATES_KEY, [])
+    st.session_state[_CUSTOM_TEMPLATES_KEY] = [t for t in custom_templates if t["name"] != name]

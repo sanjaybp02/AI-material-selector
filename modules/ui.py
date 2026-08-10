@@ -11,6 +11,7 @@ Committing to one polished theme beats half-supporting two.
 """
 
 import base64
+import html
 
 import streamlit as st
 
@@ -727,6 +728,13 @@ def section_header(step: str, title: str, subtitle: str = ""):
 
 
 def render_status_banner(message: str, kind: str = "info"):
+    """message is escaped before interpolation — every call site today
+    passes a static string except app.py's exception-handling branch
+    (f"Error: {e}"), where the exception text can echo back fragments
+    of Gemini's raw response (e.g. a JSON-parse error message includes
+    the malformed text near the failure point) — text an attacker's
+    query could have steered. Escaping here, at the sink, protects that
+    path without relying on every call site remembering to do it."""
     colors = {
         "info": ACCENT,
         "success": SUCCESS,
@@ -734,6 +742,8 @@ def render_status_banner(message: str, kind: str = "info"):
         "error": DANGER,
     }
     color = colors.get(kind, ACCENT)
+    safe_message = html.escape(str(message))
+    safe_kind = html.escape(str(kind).upper())
     st.markdown(
         f"""
 <div style="
@@ -743,7 +753,7 @@ def render_status_banner(message: str, kind: str = "info"):
     font-size: 0.875rem;
     color: {TEXT_BODY};
 ">
-    <strong>{kind.upper()}:</strong> {message}
+    <strong>{safe_kind}:</strong> {safe_message}
 </div>
 """,
         unsafe_allow_html=True,
@@ -779,11 +789,19 @@ def render_confidence_bar(confidence: int):
 
 
 def render_pros_cons(pros: list, cons: list):
+    """pros/cons come straight from Gemini's JSON response (app.py's
+    ai_data.get("Pros"/"Cons", [])) — untrusted, LLM-generated text
+    rendered here with unsafe_allow_html=True. Without escaping, a query
+    crafted to make the model emit HTML/script content in one of these
+    fields would execute in the browser of whoever ran that analysis —
+    a standard indirect-prompt-injection-to-XSS pattern for LLM-backed
+    apps. html.escape() neutralizes it while leaving the visible text
+    unchanged for the overwhelming majority of normal responses."""
     if pros:
-        tags = "".join(f'<span class="pro-tag">{p}</span>' for p in pros)
+        tags = "".join(f'<span class="pro-tag">{html.escape(str(p))}</span>' for p in pros)
         st.markdown(f"**Advantages**<br>{tags}", unsafe_allow_html=True)
     if cons:
-        tags = "".join(f'<span class="con-tag">{c}</span>' for c in cons)
+        tags = "".join(f'<span class="con-tag">{html.escape(str(c))}</span>' for c in cons)
         st.markdown(f"<br>**Trade-offs**<br>{tags}", unsafe_allow_html=True)
 
 

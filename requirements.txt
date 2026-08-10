@@ -6,3 +6,4 @@ requests
 plotly
 python-dotenv
 openpyxl
+streamlit-local-storage

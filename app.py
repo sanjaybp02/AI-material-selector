@@ -7,6 +7,20 @@ load_dotenv()
 import streamlit as st
 import pandas as pd
 from google import genai
+# streamlit_local_storage's own LocalStorage class blocks synchronously
+# (a `while ... time.sleep()` loop) waiting for the browser round trip
+# on every session's first use — under a real browser that resolves in
+# well under a second, but under any headless harness (this project's
+# AppTest-based test suite included — see tests/) there is no browser to
+# ever respond, so it hangs forever. The underlying declared component
+# it wraps does not have this problem: called directly, it follows the
+# ordinary Streamlit custom-component contract (return `default`
+# immediately; Streamlit automatically reruns the script once, exactly
+# like any other widget, when the frontend later calls back with the
+# real value) — non-blocking, and harmless under a headless harness
+# (just always returns `default`, no hang). Confirmed live: AppTest
+# timed out after 30s with the wrapper class, ran instantly using this.
+from streamlit_local_storage import _st_local_storage as _local_storage_component
 
 from modules.data_loader import (
     load_data, convert_units, get_yield_col, get_density_col, get_cost_col,
@@ -405,6 +419,46 @@ init_history()
 # their default.
 env_api_key = os.getenv("GEMINI_API_KEY", "")
 
+# Browser-side "remember my key" storage. This is deliberately NOT the
+# settings.json server file removed above — localStorage is scoped by
+# the browser's own same-origin security model to this one visitor's
+# own device, so it can never leak to another visitor the way a
+# server-side file did. On a brand-new browser session this returns ""
+# on the very first script run (the real value hasn't arrived from the
+# browser yet) and Streamlit automatically reruns once the frontend
+# calls back — same as any other widget — so the saved key appears
+# after an imperceptible extra rerun, not a blocking wait.
+saved_api_key = _local_storage_component(method="getItem", itemKey="gemini_api_key", key="get_gemini_api_key", default="") or ""
+if saved_api_key in ("null", "None") or not looks_like_gemini_key(saved_api_key):
+    # Defensive: a prior deleteItem() call (see the "forget" branch below)
+    # leaves the literal string "null" behind rather than truly clearing
+    # the entry (confirmed live) — never treat that, or any other
+    # non-key-shaped leftover, as a real saved key.
+    saved_api_key = ""
+
+# api_key_input's/remember_key_checkbox's own `value=` (below) only ever
+# seeds a widget on its very first instantiation for this session — but
+# on a session's actual first script run, saved_api_key is still "" (the
+# async round trip to read localStorage hasn't come back yet). By the
+# time saved_api_key really arrives (the one automatic rerun Streamlit
+# fires once the component responds), both widgets already exist in
+# session_state and `value=` is ignored from then on — the same rule
+# this file already relies on elsewhere for api_key_input itself.
+# Confirmed live (two separate bugs, both from this): (1) a saved key
+# never actually appeared in the field on reload even though it was
+# correctly read from storage; (2) worse, the checkbox re-derived
+# `value=bool(saved_api_key)` on *every* rerun since it had no key= of
+# its own, so unchecking it to forget a key silently snapped back to
+# checked on the very next rerun. Both are fixed the same way: write the
+# real values directly into session_state, once, before either widget
+# is instantiated — after that, ordinary user interaction with either
+# widget (via their own key=) is what session_state reflects, not this
+# block re-running.
+if saved_api_key and not st.session_state.get("_local_key_synced"):
+    st.session_state["api_key_input"] = saved_api_key
+    st.session_state["remember_key_checkbox"] = True
+    st.session_state["_local_key_synced"] = True
+
 # Sidebar
 with st.sidebar:
     st.markdown("### Settings")
@@ -424,16 +478,35 @@ with st.sidebar:
     # deployment — session_state is Streamlit's actual per-session store,
     # unlike the filesystem. value= only seeds the *first* render (Streamlit
     # ignores it on reruns once a key= is present), so this correctly
-    # defaults to the operator's own GEMINI_API_KEY env var (safe to share —
-    # it's the app owner's key, not a per-user credential) without ever
-    # reading back another visitor's previously-entered key.
+    # defaults to a saved-in-this-browser key if one exists, else the
+    # operator's own GEMINI_API_KEY env var (safe to share — it's the app
+    # owner's key, not a per-user credential) — never another visitor's key.
     api_key = st.text_input(
         "Gemini API key",
         type="password",
-        value=env_api_key,
+        value=saved_api_key or env_api_key,
         key="api_key_input",
-        help="Required for AI recommendations. Get one at Google AI Studio or set GEMINI_API_KEY in .env. Stays in your browser session only — never saved to the server.",
+        help="Required for AI recommendations. Get one at Google AI Studio or set GEMINI_API_KEY in .env. Stays in your browser — never saved to the server.",
     )
+    remember_key = st.checkbox(
+        "Remember this key on this device",
+        value=False,
+        key="remember_key_checkbox",
+        help="Saves the key in this browser's local storage so you don't have to re-enter it next time. Stored only on your device — never sent to or saved on the server. Uncheck to forget it.",
+    )
+    if remember_key:
+        if api_key and looks_like_gemini_key(api_key) and saved_api_key != api_key:
+            _local_storage_component(method="setItem", itemKey="gemini_api_key", itemValue=api_key, key="save_api_key")
+    elif saved_api_key:
+        # eraseItem, not deleteItem — the library's own deleteItem doesn't
+        # actually remove the browser entry, it just overwrites it with
+        # the literal string "null" (confirmed live: deleteItem left
+        # localStorage["gemini_api_key"] == "null", a truthy non-empty
+        # string, so the checkbox and the field kept coming back
+        # pre-filled with "null" text on the next visit). eraseItem is
+        # the one that makes getItem correctly report "" afterward.
+        _local_storage_component(method="eraseItem", itemKey="gemini_api_key", key="forget_api_key", default=None)
+
     model_name = st.selectbox(
         "Model",
         MODEL_OPTIONS,

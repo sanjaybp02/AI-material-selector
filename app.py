@@ -14,7 +14,10 @@ from modules.data_loader import (
 )
 from modules.filters import render_filters
 from modules.cost_engine import fetch_live_metal_price, calculate_part_cost
-from modules.ai_engine import get_single_recommendation, get_top3_recommendations, chat_followup, explain_filter_failure
+from modules.ai_engine import (
+    get_single_recommendation, get_top3_recommendations, chat_followup, explain_filter_failure,
+    looks_like_gemini_key, validate_api_key,
+)
 from modules.charts import radar_chart, scatter_plot, property_heatmap
 from modules.pdf_report import create_pdf
 from modules.cad_export import generate_step_file
@@ -67,6 +70,33 @@ def format_mass(result, unit_system):
         mass_display = result["mass_kg"] if unit_system == "Metric" else result["mass_kg"] * 2.20462
     mass_unit = result.get("mass_unit", "kg" if unit_system == "Metric" else "lb")
     return mass_display, mass_unit
+
+
+def _classify_api_key_status(key, model_name):
+    """Reported: typing any text into the API key field immediately
+    flipped the sidebar status to green/'API Connected' — the old check
+    was just `bool(api_key)`. This replaces it with real validation:
+    a free instant format check, then (only for text that actually looks
+    like a real key) a live check against Google's API.
+
+    The live result is cached in session_state keyed by the exact key
+    text, so it only re-fires when the user changes what's typed — not
+    on every rerun triggered by unrelated widgets (sliders, tabs, ...).
+    """
+    key = (key or "").strip()
+    if not key:
+        return "empty"
+    if not looks_like_gemini_key(key):
+        return "invalid_format"
+
+    cache = st.session_state.get("api_key_check_cache")
+    if cache and cache.get("key") == key:
+        return cache["status"]
+
+    result = validate_api_key(key, model_name)
+    status = {"valid": "connected", "invalid": "invalid_key", "unknown": "unverified"}[result]
+    st.session_state["api_key_check_cache"] = {"key": key, "status": status}
+    return status
 
 
 # ── Dialogs ─────────────────────────────────────────────────────────
@@ -452,7 +482,8 @@ with st.sidebar:
             st.session_state.pop(k, None)
         st.session_state["last_unit_system"] = unit_system
 
-    render_sidebar_status(bool(api_key), len(df_raw))
+    key_status = _classify_api_key_status(api_key, model_name)
+    render_sidebar_status(key_status, len(df_raw))
 
 df_display = convert_units(df_raw, unit_system)
 
@@ -560,10 +591,20 @@ else:
     filtered_df = df_display
     filter_vals = {}
 
-# Search readiness
+# Search readiness. key_status "invalid_format"/"invalid_key" block the
+# search the same as "empty" — Google will just reject the request
+# anyway, so there's no value letting the user submit and wait for that
+# failure. "unverified" (network hiccup while checking, not proof the
+# key is bad) is deliberately NOT a blocker — see below, lowest priority.
 can_search = True
-if not api_key:
+if key_status == "empty":
     render_status_banner("Add your Gemini API key in the sidebar to run analysis.", "warning")
+    can_search = False
+elif key_status == "invalid_format":
+    render_status_banner("That doesn't look like a valid Gemini API key — check it in the sidebar.", "warning")
+    can_search = False
+elif key_status == "invalid_key":
+    render_status_banner("Google rejected this API key. Double-check it in the sidebar or generate a new one at Google AI Studio.", "error")
     can_search = False
 elif not user_query.strip():
     render_status_banner("Describe your project requirements to continue.", "info")
@@ -579,6 +620,8 @@ elif filtered_df.empty:
             except Exception as e:
                 st.error(f"Could not explain failure: {e}")
     can_search = False
+elif key_status == "unverified":
+    render_status_banner("Could not verify the API key over the network — you can still try running the analysis.", "info")
 
 st.write("")
 find_clicked = st.button("Find materials", type="primary", disabled=not can_search, use_container_width=True)

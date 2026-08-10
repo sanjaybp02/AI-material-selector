@@ -1,5 +1,59 @@
 import json
+import re
 import time
+
+_GEMINI_KEY_RE = re.compile(r"^AIza[0-9A-Za-z_\-]{35,}$")
+
+
+def looks_like_gemini_key(key):
+    """Free, instant, local format check for Google AI Studio / Gemini API
+    keys (standard Google API key shape: 'AIza' prefix, 39 chars total —
+    matched here with a bit of slack on length in case Google ever issues
+    a slightly longer one). Used to reject obviously-not-a-key text (a
+    placeholder, a stray word, anything typed while testing) before ever
+    reporting the sidebar status as 'Connected' — confirmed live: typing
+    plain text into the API key field previously flipped the status green
+    immediately, since the old check was just `bool(api_key)`."""
+    key = (key or "").strip()
+    return bool(_GEMINI_KEY_RE.match(key))
+
+
+def validate_api_key(api_key, model_name, timeout_ms=8000):
+    """Live check that an API key actually authenticates with Google,
+    without spending generation quota/tokens — fetches metadata for one
+    model (client.models.get) instead of calling generate_content.
+    Confirmed live: an invalid key raises the same underlying error a
+    real generate_content call would (google.genai.errors.ClientError,
+    400 INVALID_ARGUMENT, reason 'API_KEY_INVALID', message 'API key not
+    valid. Please pass a valid API key.') — this call is just far
+    cheaper and faster than a full generation request.
+
+    Returns
+    -------
+    str
+        "valid"   — Google confirmed the key authenticates.
+        "invalid" — Google explicitly rejected the key itself.
+        "unknown" — the call failed for any other reason (network,
+                    timeout, transient rate limit, the specific model
+                    being temporarily unavailable, ...). This is NOT
+                    proof the key is bad — callers must not report it
+                    as an invalid key on this basis alone.
+    """
+    from google import genai
+    from google.genai import types
+
+    try:
+        client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(timeout=timeout_ms),
+        )
+        client.models.get(model=model_name)
+        return "valid"
+    except Exception as e:
+        msg = str(e).lower()
+        if any(s in msg for s in ("api_key_invalid", "api key not valid", "permission_denied", "unauthenticated")):
+            return "invalid"
+        return "unknown"
 
 
 def _require_text(response):

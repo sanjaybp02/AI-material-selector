@@ -435,6 +435,7 @@ hr {{
 }}
 .status-dot.online {{ background: var(--success); }}
 .status-dot.offline {{ background: var(--danger); }}
+.status-dot.pending {{ background: var(--warning); }}
 
 .confidence-bar {{
     height: 5px;
@@ -796,9 +797,31 @@ def render_filter_summary(chips: list[str]):
     )
 
 
-def render_sidebar_status(api_connected: bool, material_count: int):
-    dot_class = "online" if api_connected else "offline"
-    status_text = "API Connected" if api_connected else "API Key Required"
+# Maps modules.ai_engine's key-status values (see app.py's
+# _classify_api_key_status) to a dot color and label. "unverified" gets
+# its own amber/pending color rather than red — a network hiccup or a
+# transient rate-limit while checking is not proof the key is bad, so it
+# shouldn't be branded the same as a confirmed-invalid key.
+_API_KEY_STATUS_META = {
+    "empty": ("offline", "API Key Required"),
+    "invalid_format": ("offline", "Invalid key format"),
+    "invalid_key": ("offline", "Invalid API key"),
+    "unverified": ("pending", "Couldn't verify — check connection"),
+    "connected": ("online", "API Connected"),
+}
+
+
+def render_sidebar_status(key_status, material_count: int):
+    """
+    key_status : str
+        One of "empty", "invalid_format", "invalid_key", "unverified",
+        "connected" (see app.py's _classify_api_key_status). Bare
+        booleans are still accepted for backward compatibility —
+        True -> "connected", False -> "empty".
+    """
+    if isinstance(key_status, bool):
+        key_status = "connected" if key_status else "empty"
+    dot_class, status_text = _API_KEY_STATUS_META.get(key_status, _API_KEY_STATUS_META["empty"])
     st.markdown(
         f"""
 <div style="padding: 12px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 16px; background: {SURFACE};">

@@ -385,7 +385,6 @@ df_raw = load_data()
 init_history()
 
 env_api_key = os.getenv("GEMINI_API_KEY", "")
-api_key_saved = bool(settings.get("api_key", env_api_key))
 app_mode = settings.get("mode", "Advanced")
 
 # Sidebar
@@ -401,11 +400,21 @@ with st.sidebar:
         st.session_state["tour_step"] = 1
         st.rerun()
 
+    # key="api_key_input" (not persisted via settings.json): a user-typed
+    # API key must stay isolated to their own browser session. settings.json
+    # lives on the server's disk and is shared by every visitor to this
+    # deployment — session_state is Streamlit's actual per-session store,
+    # unlike the filesystem. value= only seeds the *first* render (Streamlit
+    # ignores it on reruns once a key= is present), so this correctly
+    # defaults to the operator's own GEMINI_API_KEY env var (safe to share —
+    # it's the app owner's key, not a per-user credential) without ever
+    # reading back another visitor's previously-entered key.
     api_key = st.text_input(
         "Gemini API key",
         type="password",
-        value=settings.get("api_key", env_api_key),
-        help="Required for AI recommendations. Get one at Google AI Studio or set GEMINI_API_KEY in .env",
+        value=env_api_key,
+        key="api_key_input",
+        help="Required for AI recommendations. Get one at Google AI Studio or set GEMINI_API_KEY in .env. Stays in your browser session only — never saved to the server.",
     )
     model_name = st.selectbox(
         "Model",
@@ -561,7 +570,6 @@ else:
     filter_vals = {}
 
 save_settings({
-    "api_key": api_key,
     "model_name": model_name,
     "mode": mode,
     "unit_system": unit_system,

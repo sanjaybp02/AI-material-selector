@@ -423,12 +423,26 @@ env_api_key = os.getenv("GEMINI_API_KEY", "")
 # settings.json server file removed above — localStorage is scoped by
 # the browser's own same-origin security model to this one visitor's
 # own device, so it can never leak to another visitor the way a
-# server-side file did. On a brand-new browser session this returns ""
+# server-side file did. On a brand-new browser session this returns {}
 # on the very first script run (the real value hasn't arrived from the
 # browser yet) and Streamlit automatically reruns once the frontend
 # calls back — same as any other widget — so the saved key appears
 # after an imperceptible extra rerun, not a blocking wait.
-saved_api_key = _local_storage_component(method="getItem", itemKey="gemini_api_key", key="get_gemini_api_key", default="") or ""
+#
+# method="getItem" (not used here) has a real bug in this package's
+# compiled frontend: confirmed live via the browser console
+# (TypeError: Cannot read properties of null (reading 'gemini_api_key')
+# in streamlit_local_storage's own bundle) — its getItem handler does
+# `f[itemKey]` with no null-guard when the key has never been set, so it
+# crashes instead of returning the intended default. method="getAll"
+# does NOT have this bug (its own code explicitly checks
+# `null !== value && typeof value === "object" && key in value` before
+# indexing) — it's also what the package's own LocalStorage class uses
+# internally, which is presumably why this bug goes unnoticed in normal
+# use of that class. Using getAll and indexing into it ourselves avoids
+# the crash entirely.
+saved_items = _local_storage_component(method="getAll", key="get_local_storage_all", default={}) or {}
+saved_api_key = saved_items.get("gemini_api_key", "") or ""
 if saved_api_key in ("null", "None") or not looks_like_gemini_key(saved_api_key):
     # Defensive: a prior deleteItem() call (see the "forget" branch below)
     # leaves the literal string "null" behind rather than truly clearing
@@ -436,28 +450,34 @@ if saved_api_key in ("null", "None") or not looks_like_gemini_key(saved_api_key)
     # non-key-shaped leftover, as a real saved key.
     saved_api_key = ""
 
-# api_key_input's/remember_key_checkbox's own `value=` (below) only ever
-# seeds a widget on its very first instantiation for this session — but
-# on a session's actual first script run, saved_api_key is still "" (the
+# Neither api_key_input nor remember_key_checkbox is given a `value=`
+# below — both are seeded purely through st.session_state, set here
+# *before* either widget is instantiated. Passing both `value=` and a
+# pre-existing st.session_state entry for the same key raises a visible
+# Streamlit warning ("created with a default value but also had its
+# value set via the Session State API") even though value= just gets
+# ignored — confirmed live, this warning rendered right in the sidebar
+# on every relaunch once the local-storage sync (below) started
+# pre-seeding session_state on the same run a widget also passed
+# value=. Using session_state exclusively (setdefault for the "nothing
+# saved yet" case, direct assignment for the "just synced from
+# localStorage" case) avoids the conflict entirely — the widgets always
+# read a value we already decided, never a value= argument.
+#
+# On a session's actual first script run, saved_api_key is still "" (the
 # async round trip to read localStorage hasn't come back yet). By the
 # time saved_api_key really arrives (the one automatic rerun Streamlit
 # fires once the component responds), both widgets already exist in
-# session_state and `value=` is ignored from then on — the same rule
-# this file already relies on elsewhere for api_key_input itself.
-# Confirmed live (two separate bugs, both from this): (1) a saved key
-# never actually appeared in the field on reload even though it was
-# correctly read from storage; (2) worse, the checkbox re-derived
-# `value=bool(saved_api_key)` on *every* rerun since it had no key= of
-# its own, so unchecking it to forget a key silently snapped back to
-# checked on the very next rerun. Both are fixed the same way: write the
-# real values directly into session_state, once, before either widget
-# is instantiated — after that, ordinary user interaction with either
-# widget (via their own key=) is what session_state reflects, not this
-# block re-running.
+# session_state from the setdefault() calls below — so the direct
+# assignment here (guarded to run at most once via _local_key_synced)
+# is what actually lands the real value, same as before.
 if saved_api_key and not st.session_state.get("_local_key_synced"):
     st.session_state["api_key_input"] = saved_api_key
     st.session_state["remember_key_checkbox"] = True
     st.session_state["_local_key_synced"] = True
+
+st.session_state.setdefault("api_key_input", env_api_key)
+st.session_state.setdefault("remember_key_checkbox", False)
 
 # Sidebar
 with st.sidebar:
@@ -476,21 +496,19 @@ with st.sidebar:
     # API key must stay isolated to their own browser session. settings.json
     # lives on the server's disk and is shared by every visitor to this
     # deployment — session_state is Streamlit's actual per-session store,
-    # unlike the filesystem. value= only seeds the *first* render (Streamlit
-    # ignores it on reruns once a key= is present), so this correctly
-    # defaults to a saved-in-this-browser key if one exists, else the
-    # operator's own GEMINI_API_KEY env var (safe to share — it's the app
-    # owner's key, not a per-user credential) — never another visitor's key.
+    # unlike the filesystem. No value= here — session_state (seeded above)
+    # is the only source of the default, so it correctly starts from a
+    # saved-in-this-browser key if one exists, else the operator's own
+    # GEMINI_API_KEY env var (safe to share — it's the app owner's key, not
+    # a per-user credential) — never another visitor's key.
     api_key = st.text_input(
         "Gemini API key",
         type="password",
-        value=saved_api_key or env_api_key,
         key="api_key_input",
         help="Required for AI recommendations. Get one at Google AI Studio or set GEMINI_API_KEY in .env. Stays in your browser — never saved to the server.",
     )
     remember_key = st.checkbox(
         "Remember this key on this device",
-        value=False,
         key="remember_key_checkbox",
         help="Saves the key in this browser's local storage so you don't have to re-enter it next time. Stored only on your device — never sent to or saved on the server. Uncheck to forget it.",
     )

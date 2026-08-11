@@ -21,12 +21,24 @@ license: mit
 - **Dual Modes (Lite & Advanced):**
   - **Lite Mode:** A stripped-down, distraction-free interface that instantly returns the single best material recommendation based on a prompt.
   - **Advanced Mode:** A full-featured tactical dashboard with engineering constraint sliders, multi-material comparisons, interactive data matrices, and chat-based follow-ups.
-- **AI-Powered Recommendations:** Powered by Google Gemini. The engine cross-references your natural language constraints (e.g., "I need a lightweight, high-yield material for a drone frame") with a localized database of materials.
-- **Dynamic Cost Engine:** Estimates material costs using historical CSV data, AI market estimations, or Live MetalPrice API fetching. Calculates final part costs based on target volume and density.
-- **Premium Enterprise SaaS UI:** Built with a clean, modern SaaS design using Inter typography, subtle grey borders, and a visually matched side panel.
-- **PDF Dossier Exports:** Instantly generate and download professional PDF reports for recommended materials, including engineering reasoning and cost breakdowns.
+- **AI-Powered Recommendations:** Powered by Google Gemini. The engine cross-references your natural language constraints (e.g., "I need a lightweight, high-yield material for a drone frame") with a localized database of materials, and returns a ranked, reasoned recommendation with a self-reported confidence score.
+- **Dynamic Cost Engine:** Estimates material costs using historical CSV data, AI market estimations, or Live MetalPrice API fetching. Calculates final part costs based on target volume and density, with full Metric/Imperial unit conversion.
+- **Search History & Custom Templates:** Save and revisit past searches, or save frequently used engineering prompts as reusable templates — both private to your own browser session (see **Privacy & Security** below).
+- **Remember Your API Key (opt-in):** Optionally save your Gemini API key in your own browser's local storage so you don't have to re-enter it — never sent to or stored on the server.
 - **Interactive Telemetry (Charts):** Radar charts, scatter plots, and property heatmaps built with Plotly to visually compare yield strength, density, cost, and machinability.
-- **Custom Template Vectors:** Save frequently used engineering prompts into the local database for rapid reuse.
+- **PDF Dossier Exports:** Instantly generate and download professional PDF reports for recommended materials, including engineering reasoning and cost breakdowns.
+- **Premium Enterprise SaaS UI:** Built with a clean, modern dark-theme design using Inter typography and a consistent design-token system.
+
+## 🔒 Privacy & Security
+
+This app serves every visitor from one shared server process — a common source of accidental cross-user data leaks in Streamlit apps if state isn't handled deliberately. This project treats that as a first-class design constraint, not an afterthought:
+
+- **Nothing is written to shared server-side files.** Your API key, filters, search history, and custom templates all live in Streamlit's per-session state (`st.session_state`) — private to your own browser session, never visible to other visitors, and never persisted on the server's disk.
+- **API keys are validated, not just accepted.** The sidebar status only ever shows "Connected" after Google's own API confirms the key actually authenticates — not just because *something* was typed into the box.
+- **AI-generated and error text is sanitized before rendering**, closing a real cross-site-scripting (XSS) class of vulnerability that indirect prompt injection can otherwise open in LLM-backed apps.
+- **CSV import is sanitized against spreadsheet formula injection**, so an imported history file can't smuggle in a live formula that executes later when re-exported and opened in Excel/Sheets.
+
+These weren't theoretical hardening exercises — each one started as a real bug found through live testing and was fixed and verified end-to-end. See `TECHNICAL_PAPER_AND_RELEASE_NOTES.md` for the full history.
 
 ## 🛠️ Tech Stack
 - **Frontend / Framework:** Streamlit
@@ -34,6 +46,9 @@ license: mit
 - **Data Processing:** Pandas
 - **Data Visualization:** Plotly
 - **PDF Generation:** FPDF2
+- **Spreadsheet Export:** openpyxl
+- **Secrets Management:** python-dotenv (local `.env`, never committed)
+- **Browser-Side Key Storage:** streamlit-local-storage (opt-in, client-side only)
 
 ## 📦 Installation & Setup
 
@@ -55,17 +70,19 @@ license: mit
    ```
 
 4. **Authentication:**
-   Upon launching, enter your **Google Gemini API Key** in the left sidebar to activate the AI engine.
+   Enter your **Google Gemini API Key** in the left sidebar to activate the AI engine (get one free at [Google AI Studio](https://aistudio.google.com/)). For local development, you can instead set `GEMINI_API_KEY` in a `.env` file (already gitignored) so it's pre-filled automatically. Optionally check "Remember this key on this device" to save it in your own browser for next time — it's never sent to or stored on the server.
 
 ## 📁 Project Architecture
 - `app.py`: Main application entry point and UI orchestrator.
-- `modules/ai_engine.py`: Handles interactions with Google Gemini, including prompt structuring and chat history.
+- `modules/ai_engine.py`: Handles interactions with Google Gemini — prompt structuring, chat history, retry/fallback across model versions, and live API-key validation.
 - `modules/cost_engine.py`: Calculates material part costs based on density, volume, and APIs.
 - `modules/data_loader.py`: Ingests and processes the `materials.csv` database, handling metric/imperial unit conversions.
-- `modules/filters.py`: Renders the dynamic slider constraints for Yield Strength, Density, and Temperature.
+- `modules/filters.py`: Renders the dynamic slider constraints (Yield Strength, Density, Temperature, and more), clamped to the dataset's valid range.
 - `modules/charts.py`: Plotly visualization engine.
 - `modules/pdf_report.py`: FPDF2 generator for downloadable engineering dossiers.
-- `modules/templates.py`: Manages the reading and writing of `templates.json` for custom prompts.
+- `modules/history.py`: Search history — save, edit, import/export as CSV/Excel. Private per browser session (`st.session_state`), never written to a server file.
+- `modules/templates.py`: Custom prompt templates. Private per browser session (`st.session_state`), never written to a server file.
+- `modules/ui.py`: Shared design system, theming, and reusable presentation components.
 
 ---
 *made with ❤️ by sanjay bp*

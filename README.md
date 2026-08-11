@@ -12,6 +12,8 @@ license: mit
 
 # ⚙️ AI Material Selector
 
+[![Tests](https://github.com/sanjaybp02/AI-material-selector/actions/workflows/tests.yml/badge.svg?branch=v2.0)](https://github.com/sanjaybp02/AI-material-selector/actions/workflows/tests.yml)
+
 **AI Material Selector** is a tactical, engineering-focused Streamlit application that leverages the Google Gemini AI engine to help engineers, designers, and manufacturers find the optimal materials for their projects based on physical constraints, cost limits, and natural language requirements.
 
 ---
@@ -78,6 +80,15 @@ These weren't theoretical hardening exercises — each one started as a real bug
    pip install cadquery
    ```
    No app configuration is needed — `cadquery_available()` detects it automatically and enables the extra options.
+
+## 🧪 Testing
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/
+```
+
+46 tests, no API key or network access required — they exercise real logic (unit conversion, cost math, formula-injection sanitization, XSS escaping, CAD/STEP generation) and, for the two features that were once real cross-visitor data leaks, a genuine two-independent-session isolation proof via `streamlit.testing.v1.AppTest` rather than a single-process assumption. Runs automatically on every push via GitHub Actions (`.github/workflows/tests.yml`).
 
 ## 📁 Project Architecture
 - `app.py`: Main application entry point and UI orchestrator.

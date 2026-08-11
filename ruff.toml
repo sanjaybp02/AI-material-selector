@@ -1,0 +1,17 @@
+# Scoped deliberately narrow: this repo wasn't written against a strict
+# style guide from day one, so enabling ruff's full default rule set now
+# would surface hundreds of pre-existing style opinions (line length,
+# import order, etc.) unrelated to correctness - noise that would bury
+# the findings that actually matter and make the CI check something to
+# routinely ignore rather than trust.
+#
+# E9 = pycodestyle runtime errors (syntax errors) - would break the app.
+# F  = pyflakes - unused imports/variables, undefined names, f-strings
+#      with no placeholders, and similar genuine-bug-shaped issues.
+#
+# Expand this list deliberately later (e.g. add "I" for import sorting,
+# "UP" for pyupgrade) rather than switching to an unscoped default.
+target-version = "py311"
+
+[lint]
+select = ["E9", "F"]

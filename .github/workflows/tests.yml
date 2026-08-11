@@ -27,3 +27,52 @@ jobs:
 
       - name: Run test suite
         run: pytest tests/ -v
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install ruff
+        run: pip install ruff
+
+      # Rule set is deliberately scoped to real-bug-shaped findings
+      # (syntax errors, unused imports, undefined names) - see ruff.toml
+      # for why. This step DOES fail the build - these are genuine
+      # issues, not style opinions, so a red check here means something
+      # real broke.
+      - name: Lint (ruff)
+        run: ruff check .
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      # Report-only, deliberately: this surfaced 2 direct streamlit CVEs
+      # (fixed in 1.53.1/1.54.0) and ~25 transitive pillow CVEs, but the
+      # fix is a 17-minor-version streamlit bump (current ceiling is
+      # <1.45.0) - a real risk to this app's custom CSS, which has
+      # already broken once before from a Streamlit internal selector
+      # change. That bump needs its own live-browser verification pass,
+      # not a silent CI gate. continue-on-error keeps this step's
+      # findings visible (it shows as failed, not swallowed) without
+      # blocking pytest/lint from reporting success independently.
+      - name: Scan dependencies for known vulnerabilities
+        run: pip-audit -r requirements.txt
+        continue-on-error: true

@@ -30,7 +30,7 @@ def _normalize_column(series, invert=False):
 def radar_chart(df, selected_names, unit_system="Metric"):
     from modules.data_loader import (
         get_yield_col, get_density_col, get_modulus_col,
-        get_thermal_col, get_cost_col, get_fatigue_col, get_carbon_col
+        get_cost_col, get_fatigue_col, get_carbon_col
     )
 
     cols = {

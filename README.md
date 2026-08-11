@@ -88,7 +88,12 @@ pip install -r requirements-dev.txt
 pytest tests/
 ```
 
-46 tests, no API key or network access required — they exercise real logic (unit conversion, cost math, formula-injection sanitization, XSS escaping, CAD/STEP generation) and, for the two features that were once real cross-visitor data leaks, a genuine two-independent-session isolation proof via `streamlit.testing.v1.AppTest` rather than a single-process assumption. Runs automatically on every push via GitHub Actions (`.github/workflows/tests.yml`).
+46 tests, no API key or network access required — they exercise real logic (unit conversion, cost math, formula-injection sanitization, XSS escaping, CAD/STEP generation) and, for the two features that were once real cross-visitor data leaks, a genuine two-independent-session isolation proof via `streamlit.testing.v1.AppTest` rather than a single-process assumption.
+
+CI (`.github/workflows/tests.yml`) runs three checks on every push/PR:
+- **pytest** — the 46 tests above, blocking.
+- **lint** (`ruff`, config in `ruff.toml`) — scoped to real-bug-shaped findings (syntax errors, unused imports, undefined names), not style opinions; blocking.
+- **dependency-audit** (`pip-audit`) — scans for known CVEs in dependencies; report-only for now. It currently flags 2 direct `streamlit` CVEs and ~25 transitive `pillow` CVEs, fixed by a `streamlit` bump this repo hasn't taken yet — see the workflow file for why that's a deliberate, tracked decision rather than an oversight.
 
 ## 📁 Project Architecture
 - `app.py`: Main application entry point and UI orchestrator.

@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 
 from modules.data_loader import (
     get_yield_col, get_temp_col, get_modulus_col,

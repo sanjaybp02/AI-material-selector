@@ -9,8 +9,7 @@ import pandas as pd
 from google import genai
 
 from modules.data_loader import (
-    load_data, convert_units, get_yield_col, get_density_col, get_cost_col,
-    get_currency_symbol, get_volume_unit, get_carbon_col,
+    load_data, convert_units, get_yield_col, get_density_col, get_currency_symbol, get_volume_unit,
 )
 from modules.filters import render_filters
 from modules.cost_engine import fetch_live_metal_price, calculate_part_cost
@@ -423,7 +422,7 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
                     try:
                         cad_result = generate_specimen("cube", (20, 20, 20), item["exact_name"], item.get("properties"))
                         st.download_button(
-                            f"CAD (STEP)", data=cad_export_bytes(cad_result, "step"),
+                            "CAD (STEP)", data=cad_export_bytes(cad_result, "step"),
                             file_name=f"{item['exact_name'].replace(' ', '_')}_specimen.stp",
                             mime="application/step", key=f"step_{rank}",
                             use_container_width=True,
@@ -431,7 +430,7 @@ def render_advanced_results(processed, rec_names, df_display, unit_system, api_k
                     except CadEngineError as e:
                         st.error(f"CAD export failed: {e}")
                 with c_btn3:
-                    if st.button(f"Datasheet", key=f"ds_{rank}", use_container_width=True):
+                    if st.button("Datasheet", key=f"ds_{rank}", use_container_width=True):
                         render_datasheet(item.get("properties", {}))
 
     with tab_charts:

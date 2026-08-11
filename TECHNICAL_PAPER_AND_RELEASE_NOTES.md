@@ -29,34 +29,47 @@ graph TD
     User([User / Engineer]) -->|Input Constraints / Prompts| UI[Streamlit UI Orchestrator: app.py]
     UI -->|Loads & Converts Units| DL[Data Loader: modules/data_loader.py]
     DL <-->|Reads| CSV[(materials.csv)]
-    
+
     UI -->|Render UI Sliders| FI[Filters: modules/filters.py]
-    UI -->|Selects Templates| TM[Templates Manager: modules/templates.py]
-    TM <-->|Reads/Writes| JSON[(templates.json)]
-    
+    UI -->|Selects/Saves Templates| TM[Templates Manager: modules/templates.py]
+    UI -->|Logs/Reads History| HI[History: modules/history.py]
+    TM -->|Session-Private| ST[(st.session_state)]
+    HI -->|Session-Private| ST
+
     UI -->|Prompt + Context| AI[AI Engine: modules/ai_engine.py]
     AI <-->|Generates Inferences| Gemini[Google Gemini Flash/Pro API]
-    
+
     UI -->|Compute Part Cost| CE[Cost Engine: modules/cost_engine.py]
     CE -->|Live Spot Prices| MP[MetalPrice API]
     CE -->|Fallback Prices| Gemini
-    
+
     UI -->|Pass Filtered Data| CH[Charts Engine: modules/charts.py]
     CH -->|Renders Plotly| UI
-    
+
+    UI -->|Generate/Upload + Apply Properties| CAD[CAD Studio: modules/cad_engine.py]
+    CAD -->|STEP Generation & Injection| CX[modules/cad_export.py]
+    CAD -->|Optional Geometry Kernel| CQ{cadquery installed?}
+    CQ -->|Yes| RealGeo[Real B-Rep geometry, any dimensions]
+    CQ -->|No| Fallback[Dependency-free cube template]
+
     UI -->|Compile Dossier| PDF[PDF Report: modules/pdf_report.py]
     PDF -->|Download Dossier| User
 ```
 
+Note on `st.session_state`: every visitor's browser session gets its own isolated instance — nothing that touches it is ever written to a file on the server's disk. This replaced an earlier design (a shared `templates.json`/`history.db` on the server) after live testing confirmed it leaked one visitor's saved templates and search history to every other visitor of the deployment; see Section 7.
+
 ### Module Descriptions:
 1. **`app.py`**: The central controller and UI manager. Handles state machine management (e.g., switching between Lite and Advanced modes) and sidebar controls.
 2. **`modules/data_loader.py`**: Implements robust Pandas preprocessing. Loads `materials.csv`, handles missing columns, and converts unit systems (Imperial/Metric).
-3. **`modules/filters.py`**: A deterministic constraint engine that renders sliders and filters data matrices based on mathematical bounds.
-4. **`modules/ai_engine.py`**: Standardizes system prompts, context window formatting, and chat history. Interacts directly with the `google-genai` SDK.
+3. **`modules/filters.py`**: A deterministic constraint engine that renders sliders and filters data matrices based on mathematical bounds, clamped to the dataset's actual valid range.
+4. **`modules/ai_engine.py`**: Standardizes system prompts, context window formatting, and chat history. Interacts directly with the `google-genai` SDK, with retry/fallback logic across model versions and live API-key validation.
 5. **`modules/cost_engine.py`**: The pricing computation module. Implements a fallback logic chain: it first attempts to fetch live market rates via the MetalPrice API; if unavailable or unsupported, it queries Gemini for real-time market estimates, falling back to static CSV data.
 6. **`modules/charts.py`**: Generates interactive visualization models using Plotly (Radar Charts, Scatter Plots, and Property Heatmaps).
 7. **`modules/pdf_report.py`**: A report generation utility using FPDF2 to generate formal engineering dossiers containing charts, reasoning, and cost breakdowns.
-8. **`modules/templates.py`**: Manages custom prompt presets stored in a local JSON structure.
+8. **`modules/templates.py`**: Manages custom prompt presets, stored in `st.session_state` (private per visitor).
+9. **`modules/history.py`**: Logs and manages the search history table (save/edit/import/export), stored in `st.session_state` (private per visitor), with spreadsheet-formula-injection sanitization on any imported or hand-edited cell.
+10. **`modules/cad_engine.py`**: CAD Studio's orchestration layer. Validates inputs, dispatches to the dependency-free or `cadquery` geometry path, builds the preview mesh, and exposes one `CadResult` contract regardless of source (generated vs. uploaded).
+11. **`modules/cad_export.py`**: Low-level STEP (ISO-10303-21) file generation and a format-agnostic material-property injector that works on both self-generated specimens and arbitrary uploaded STEP AP203/AP214/AP242 files.
 
 ---
 
@@ -140,10 +153,41 @@ This workflow allows users to save prompts and generate offline documents.
 graph LR
     A[User Action] --> B{Action Type}
     B -->|Save Template| C[templates.py]
-    C -->|Write JSON| D[(templates.json)]
+    C -->|Write to session_state, private per visitor| D[(st.session_state)]
     B -->|Export Dossier| E[pdf_report.py]
     E -->|Fetch current view states & charts| F[FPDF2 Generation Engine]
     F -->|Compile PDF file| G[Downloadable PDF Dossier]
+```
+
+### Workflow E: CAD Studio Generation, Property Injection & Export
+This workflow lets an engineer turn a recommended material into a real CAD deliverable — either a freshly generated specimen or their own uploaded part.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant App as app.py
+    participant CAD as cad_engine.py
+    participant CX as cad_export.py
+    participant CQ as cadquery (optional)
+
+    alt Generate specimen
+        User->>App: Choose dimensions (L x W x H)
+        App->>CAD: Request specimen geometry
+        CAD->>CQ: Build real B-Rep box, if cadquery is installed
+        CQ-->>CAD: Tessellated mesh + STEP body
+        Note over CAD: If cadquery is absent, fall back to<br/>a dependency-free cube template - always works.
+    else Upload STEP file
+        User->>App: Upload .step / .stp file
+        App->>CAD: Parse uploaded entities
+        CAD->>CX: Scan PRODUCT / PRODUCT_DEFINITION entities
+    end
+    User->>App: Select material from recommendations
+    App->>CAD: Inject material properties (density, yield strength, ...)
+    CAD->>CX: Write properties into STEP metadata
+    CX-->>CAD: Updated STEP file + preview mesh
+    CAD-->>App: CadResult (mesh, STEP bytes, STL bytes)
+    App->>User: Render in-browser 3D viewer + STEP/STL download
 ```
 
 ---
@@ -159,7 +203,7 @@ We are proud to announce the official release of **AI Material Selector v1.0.0**
     *   *Radar Chart:* To visually compare multiple candidate materials across multiple axes (Machinability, Cost, Strength, Temp, Density).
     *   *Property Scatter Plot:* Yield Strength vs. Density with bubble sizing mapping to cost.
 *   **PDF Dossier Compilation:** Generates styled engineering reports containing the selection matrices, AI reasoning, and cost estimates.
-*   **JSON-based Custom Vector Templates:** Allows users to save complex constraint layouts and prompts as reusable templates.
+*   **Custom Vector Templates:** Allows users to save complex constraint layouts and prompts as reusable templates, private to their own session.
 
 ### Visual & Performance Refinements
 *   **Premium Tactical UI Theme:** Customized CSS injecting `Inter` and `JetBrains Mono` fonts, modern glassmorphism containers, subtle grey borders, and styled sidebar control groups.
@@ -168,7 +212,38 @@ We are proud to announce the official release of **AI Material Selector v1.0.0**
 
 ---
 
+## 5a. Release Notes v2.0.0-dev (`v2.0` branch, in progress)
+
+This branch builds on v1.0.0 with a new **CAD Studio** capability, plus the same session-privacy and XSS/CSV-injection hardening described in Section 7 (ported here from `main`).
+
+*   **CAD Studio:** Generate a parametric specimen (a cube always works dependency-free; L x W x H boxes and true mesh tessellation unlock automatically if the optional `cadquery` package is installed) or upload an existing STEP file. Either way, the selected material's properties (density, yield strength, and more) are written directly into the STEP metadata, previewed in an in-browser three.js viewer, and downloadable as STEP or STL — ready for SolidWorks, FreeCAD, ANSYS, or SpaceClaim.
+*   **Format-agnostic property injection:** `modules/cad_export.py` scans `PRODUCT` / `PRODUCT_DEFINITION` entities with a regex-based reader, so property injection works on self-generated specimens and on arbitrary uploaded STEP AP203/AP214/AP242 files alike, not just files this app produced itself.
+*   **Graceful degradation:** `cadquery_available()` is checked at runtime, not assumed. Every CAD Studio feature has a working path with zero extra dependencies; `cadquery` only unlocks non-cube dimensions and full B-Rep tessellation on top of that baseline.
+
+---
+
 ## 6. Future Roadmap
-*   **3D STL Viewer:** Render part files directly inside Streamlit to calculate target volume automatically from geometry.
-*   **Cloud Templates Synchronization:** Sync user prompt libraries across machines using cloud databases.
 *   **Database Expansion:** Adding carbon fiber composites, high-temperature superalloys, and 3D printing filaments (PLA, PETG, ABS, Nylon) to the dataset.
+*   **ASTM-standard specimen geometry:** Parametric tensile (E8) and notched-bar (Charpy) specimen generation from standard dimensions, not just cubes/boxes.
+*   **FEA-ready property export:** Embed Poisson's Ratio, thermal expansion coefficient, and a yield criterion into exported STEP files alongside existing properties.
+*   **Merge to `main`:** Once a throwaway Streamlit Cloud deployment confirms `cadquery` installs cleanly in that hosted environment, merge CAD Studio into `main` as the default experience for all users.
+
+> Note: an earlier version of this roadmap listed a 3D STL viewer and cloud-synced template libraries as future work. The 3D viewer is exactly what CAD Studio (this branch) already ships. Cloud-synced templates were deliberately **not** built — after a real cross-visitor data leak was found and fixed (Section 7), templates and history were kept intentionally private and local to each browser session rather than made more widely shared.
+
+---
+
+## 7. Security & Privacy Hardening (Post-Launch)
+
+After the v1.0.0 launch described above, a security review of the deployed application found and fixed several real, live vulnerabilities — not theoretical ones, each confirmed through direct testing against the running app before and after the fix. These fixes were made on `main` and ported to this `v2.0` branch so CAD Studio development never regresses on privacy or security.
+
+| Issue | Root cause | Fix |
+|---|---|---|
+| API key visible to every visitor | Saved to a shared `settings.json` file on the server, read back as the default for the next visitor | Moved to `st.session_state`, private per browser session |
+| Every UI setting (filters, units, mode) leaked across visitors | Same shared-file pattern, applied to all sidebar state | Same fix, applied app-wide |
+| "API Connected" shown for any typed text | Status was `bool(api_key)` — true for any non-empty string | Added a format check plus a live check against Google's API |
+| Search history and custom templates visible to every visitor | `history.db` (SQLite) and `templates.json` were shared server files, exportable/editable by anyone | Moved both to `st.session_state` |
+| Cross-site scripting (XSS) via AI-generated text | `render_pros_cons()`/`render_status_banner()` inserted Gemini's raw output into the page as unescaped HTML | Escaped with `html.escape()` at the render sink |
+| Spreadsheet formula injection via history import | Imported/edited history cells were written back out via Export as CSV/Excel with no sanitization | Cells starting with `=`, `+`, `-`, `@` are prefixed with a leading apostrophe before storage |
+| Hardcoded pricing-API key in source | A real MetalPriceAPI key was committed directly in `cost_engine.py` | Removed; key now required via environment variable, old key rotated |
+
+Every fix above was verified with an automated, repeatable test (two independent simulated visitor sessions confirming no data crosses between them, or a deliberately malicious payload confirmed neutralized) before being considered resolved.

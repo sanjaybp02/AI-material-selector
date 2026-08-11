@@ -10,6 +10,7 @@ from google import genai
 
 from modules.data_loader import (
     load_data, convert_units, get_yield_col, get_density_col, get_currency_symbol, get_volume_unit,
+    validate_materials_df,
 )
 from modules.filters import render_filters
 from modules.cost_engine import fetch_live_metal_price, calculate_part_cost
@@ -24,7 +25,7 @@ from modules.cad_engine import (
     cadquery_available, CadEngineError,
 )
 from modules.history import init_history, log_search, render_history_table
-from modules.templates import load_templates, save_custom_template, delete_custom_template
+from modules.templates import load_templates, save_custom_template, delete_custom_template, TemplateValidationError
 from modules.ui import (
     inject_theme, render_hero, section_header, render_status_banner,
     render_empty_state, render_confidence_bar, render_pros_cons,
@@ -109,11 +110,11 @@ def create_template_dialog():
     t_desc = st.text_input("Short description", placeholder="Shown on hover")
     t_prompt = st.text_area("Prompt text", placeholder="Describe material requirements...", height=120)
     if st.button("Save template", type="primary"):
-        if t_name and t_prompt:
+        try:
             save_custom_template(t_name, t_desc, t_prompt)
             st.rerun()
-        else:
-            st.error("Name and prompt are required.")
+        except TemplateValidationError as e:
+            st.error(str(e))
 
 
 @st.dialog("Material Datasheet")
@@ -518,6 +519,18 @@ inject_clarity()
 
 # Load main application data
 df_raw = load_data()
+
+# Fail fast, with a clear message, if materials.csv is missing, empty,
+# or malformed — rather than let the app render normally and crash
+# minutes later with a cryptic KeyError buried inside a filter slider,
+# a chart, or a cost calculation, far from the actual cause.
+_data_valid, _data_errors = validate_materials_df(df_raw)
+if not _data_valid:
+    st.error("**materials.csv failed validation — the app can't run safely with this data:**")
+    for _err in _data_errors:
+        st.error(f"• {_err}")
+    st.stop()
+
 init_history()
 
 # All UI preferences below (mode, units, sliders, ...) are seeded with

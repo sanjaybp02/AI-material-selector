@@ -9,6 +9,70 @@ def load_data(csv_path="materials.csv"):
     return pd.DataFrame()
 
 
+# Every downstream module (filters.py, charts.py, cost_engine.py,
+# cad_export.py) assumes these columns exist and reads them directly by
+# name — none of them validate first. Without a check here, a missing or
+# renamed column in materials.csv doesn't fail where the real problem is;
+# it fails minutes later as a cryptic KeyError deep inside a filter
+# slider or a chart, far from the actual cause.
+REQUIRED_MATERIAL_COLUMNS = [
+    "Material Name", "Category", "Yield Strength (MPa)", "Density (g/cm³)",
+    "Max Temp (°C)", "Elastic Modulus (GPa)", "Thermal Conductivity (W/m·K)",
+    "Machinability (1-10)", "Cost per Kg (INR)", "Fatigue Strength (MPa)",
+    "Embodied Carbon (kg CO2/kg)",
+]
+
+# Columns every cost/filter/chart calculation treats as real numbers.
+# pandas silently reads a mixed-type CSV column as dtype=object rather
+# than raising, so a single stray non-numeric cell (a typo, a unit
+# suffix accidentally left in) would otherwise reach float()/arithmetic
+# deep in another module before ever surfacing as an error.
+_NUMERIC_MATERIAL_COLUMNS = [
+    "Yield Strength (MPa)", "Density (g/cm³)", "Max Temp (°C)",
+    "Elastic Modulus (GPa)", "Thermal Conductivity (W/m·K)",
+    "Machinability (1-10)", "Cost per Kg (INR)", "Fatigue Strength (MPa)",
+    "Embodied Carbon (kg CO2/kg)",
+]
+
+
+def validate_materials_df(df):
+    """Validate the loaded materials DataFrame before the rest of the app
+    ever touches it. Returns (is_valid, errors) rather than raising, so
+    the caller can decide how to present the problem (this app shows all
+    of them at once and stops, instead of the user fixing one typo per
+    reload).
+    """
+    errors = []
+    if df is None or df.empty:
+        errors.append("materials.csv is missing, empty, or failed to load.")
+        return False, errors
+
+    missing = [c for c in REQUIRED_MATERIAL_COLUMNS if c not in df.columns]
+    if missing:
+        errors.append(f"Missing required column(s): {', '.join(missing)}")
+        return False, errors  # can't safely check row-level content without the columns
+
+    name_col = df["Material Name"]
+    if name_col.isna().any() or (name_col.astype(str).str.strip() == "").any():
+        errors.append("One or more rows have a blank 'Material Name'.")
+
+    normalized_names = name_col.astype(str).str.strip().str.lower()
+    dupes = sorted(normalized_names[normalized_names.duplicated()].unique())
+    if dupes:
+        errors.append(f"Duplicate 'Material Name' value(s): {', '.join(dupes)}")
+
+    for col in _NUMERIC_MATERIAL_COLUMNS:
+        coerced = pd.to_numeric(df[col], errors="coerce")
+        bad_mask = coerced.isna() & df[col].notna()
+        if bad_mask.any():
+            bad_names = df.loc[bad_mask, "Material Name"].astype(str).tolist()
+            shown = ", ".join(bad_names[:5])
+            more = f" (+{len(bad_names) - 5} more)" if len(bad_names) > 5 else ""
+            errors.append(f"Non-numeric value(s) in '{col}' for: {shown}{more}")
+
+    return (len(errors) == 0), errors
+
+
 # ----- Unit Conversion System -----
 
 # Column name mappings: Metric -> Imperial

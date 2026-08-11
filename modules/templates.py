@@ -11,6 +11,14 @@ import streamlit as st
 # their browser.
 _CUSTOM_TEMPLATES_KEY = "custom_templates"
 
+MAX_TEMPLATE_NAME_LEN = 60
+MAX_TEMPLATE_PROMPT_LEN = 2000
+
+
+class TemplateValidationError(ValueError):
+    """Message is safe to show directly to the user as-is."""
+    pass
+
 DEFAULT_TEMPLATES = [
     {
         "name": "Aerospace Frame",
@@ -95,6 +103,35 @@ def load_templates():
     return merged
 
 def save_custom_template(name, description, prompt):
+    """Raises TemplateValidationError (not a bare exception) for any
+    problem the caller should show directly to the user.
+
+    Previously only checked `if t_name and t_prompt` at the call site in
+    app.py — a whitespace-only name (" ") is truthy in Python, so that
+    check let a blank-looking template through. There was also no
+    duplicate-name check: two custom templates sharing a name doesn't
+    just look confusing in the picker, it collides on the Streamlit
+    widget key `f"del_{t['name']}"` in render_template_picker(), which
+    raises a DuplicateWidgetID crash the next time that picker renders —
+    a real bug, not just a UX rough edge.
+    """
+    name = (name or "").strip()
+    description = (description or "").strip()
+    prompt = (prompt or "").strip()
+
+    if not name:
+        raise TemplateValidationError("Template name can't be empty.")
+    if not prompt:
+        raise TemplateValidationError("Prompt text can't be empty.")
+    if len(name) > MAX_TEMPLATE_NAME_LEN:
+        raise TemplateValidationError(f"Template name is too long (max {MAX_TEMPLATE_NAME_LEN} characters).")
+    if len(prompt) > MAX_TEMPLATE_PROMPT_LEN:
+        raise TemplateValidationError(f"Prompt text is too long (max {MAX_TEMPLATE_PROMPT_LEN} characters).")
+
+    existing_names = {t["name"].strip().lower() for t in load_templates()}
+    if name.lower() in existing_names:
+        raise TemplateValidationError(f"A template named '{name}' already exists — choose a different name.")
+
     custom_templates = st.session_state.get(_CUSTOM_TEMPLATES_KEY, [])
     custom_templates.append({
         "name": name,

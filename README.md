@@ -72,6 +72,10 @@ These weren't theoretical hardening exercises — each one started as a real bug
 4. **Authentication:**
    Enter your **Google Gemini API Key** in the left sidebar to activate the AI engine (get one free at [Google AI Studio](https://aistudio.google.com/)). For local development, you can instead set `GEMINI_API_KEY` in a `.env` file (already gitignored) so it's pre-filled automatically. Optionally check "Remember this key on this device" to save it in your own browser for next time — it's never sent to or stored on the server.
 
+## 💤 Live Demo Sleep Behavior
+
+The hosted demo runs on Streamlit Community Cloud's free tier, which puts an app to sleep after a period of inactivity. If the link shows a "Zzzz" wake-up screen, click **"Yes, get this app back up!"** — it takes under a minute. An automated keep-alive was attempted (see git history) but Streamlit Cloud appears to deliberately block that class of automated visit from cloud/CI IP ranges, which is a reasonable anti-abuse measure on their part — so this is a known, accepted limitation of the free tier rather than something worth fighting further.
+
 ## 📁 Project Architecture
 - `app.py`: Main application entry point and UI orchestrator.
 - `modules/ai_engine.py`: Handles interactions with Google Gemini — prompt structuring, chat history, retry/fallback across model versions, and live API-key validation.

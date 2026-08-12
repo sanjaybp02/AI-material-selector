@@ -2,83 +2,40 @@ name: Keep App Alive
 
 on:
   schedule:
-    # Run every 10 minutes to ensure Streamlit Cloud never sleeps
-    - cron: '*/10 * * * *'
+    # GitHub throttles high-frequency schedules under real-world load -
+    # a */10 cron on this repo was actually landing roughly hourly in
+    # practice (confirmed via run history), so */30 here is an honest
+    # target rather than a number GitHub won't deliver on anyway.
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Streamlit Cloud Application
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Playwright
         run: |
-          # Streamlit Community Cloud's *.streamlit.app domain always
-          # bounces a fresh request through a 3-hop handshake before
-          # reaching the real app, even for a fully public app:
-          #   1) app URL          -> 303 -> share.streamlit.io/-/auth/app
-          #   2) auth/app         -> 303 -> app URL/-/login?payload=<token>
-          #   3) /-/login?payload -> 303 -> app URL/
-          #   4) app URL (with the session cookie from step 2/3) -> 200
-          #
-          # A ping that only checks the FIRST status code (as this
-          # workflow used to) always sees a 303 and reports "success"
-          # without ever reaching the actual app - a permanent false
-          # positive. Following the chain with `-L` but WITHOUT a
-          # cookie jar doesn't fix it either: without the cookie set at
-          # step 2 being sent back on step 3's request, it just bounces
-          # between auth/login forever. `-c`/`-b` against the same
-          # cookie file is what makes the handshake actually terminate.
-          ping_url() {
-            local url="$1"
-            local name="$2"
-            local jar
-            jar="$(mktemp)"
-            echo "Pinging $name: $url"
+          pip install playwright
+          playwright install --with-deps chromium
 
-            local status_code="000"
-            local attempts=3
-
-            for ((i=1; i<=attempts; i++)); do
-              echo "Attempt $i of $attempts..."
-              status_code=$(curl -sL -c "$jar" -b "$jar" -o /dev/null -w "%{http_code}" \
-                -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 KeepAliveBot/2.0" \
-                --max-time 25 "$url" || echo "000")
-
-              echo "Final status code after following the full redirect chain: $status_code"
-
-              if [[ "$status_code" == "200" ]]; then
-                echo "✅ $name reached the real app (200)."
-                rm -f "$jar"
-                return 0
-              fi
-
-              if [ $i -lt $attempts ]; then
-                echo "Waiting 5 seconds before retrying..."
-                sleep 5
-              fi
-            done
-
-            echo "⚠️ $name never reached a real 200 after $attempts attempts. Last status code: $status_code"
-            rm -f "$jar"
-            return 1
-          }
-
-          # Single source of truth: an APP_URL repo secret overrides
-          # this if set (check Settings > Secrets and variables >
-          # Actions if this workflow is pinging the wrong place again -
-          # a stale secret silently wins over the line below). Confirm
-          # the real URL under share.streamlit.io > your app > Settings
-          # > General > "App URL" before ever editing this default -
-          # this exact subdomain (stray "02") being wrong is what
-          # caused this workflow to silently ping a dead 404 for its
-          # entire run history.
-          TARGET_URL="${{ secrets.APP_URL }}"
-          if [ -z "$TARGET_URL" ]; then
-            TARGET_URL="https://ai-material-selector-sanjaybp.streamlit.app"
-          fi
-
-          if ping_url "$TARGET_URL" "App"; then
-            exit 0
-          else
-            exit 1
-          fi
+      # A curl-based version of this workflow used to run here and
+      # always report "success" - it really did reach a genuine 200 on
+      # the app's static HTML shell, but a bare HTTP client never
+      # executes JavaScript, so it never fired the actual
+      # POST /api/v1/app/event/open call Streamlit Community Cloud
+      # uses to register a real visit and reset its sleep timer. The
+      # app kept going to sleep the whole time regardless of that
+      # "success." See .github/scripts/wake_streamlit_app.py for the
+      # full story and verification.
+      - name: Visit the app like a real browser
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+        run: python .github/scripts/wake_streamlit_app.py
